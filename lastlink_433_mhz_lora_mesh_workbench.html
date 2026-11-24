@@ -1,0 +1,3082 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>LASTLINK // 433 MHz LoRa Mesh Workbench</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-chassis: #0b0d10;
+      --bg-panel: #12151b;
+      --bg-elevated: #181c24;
+      --bg-hover: #1f242f;
+      --border-hairline: #232833;
+      --border-strong: #323949;
+      --text-primary: #e5e7eb;
+      --text-secondary: #8b949e;
+      --accent-cyan: #38bdf8;
+      --accent-green: #10b981;
+      --accent-amber: #f59e0b;
+      --accent-red: #ef4444;
+    }
+
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0;
+      padding: 0;
+      background-color: var(--bg-chassis);
+      color: var(--text-primary);
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      font-size: 12px;
+      line-height: 1.4;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .mono { font-family: 'JetBrains Mono', monospace; }
+
+    /* Industrial scrollbars */
+    ::-webkit-scrollbar { width: 5px; height: 5px; }
+    ::-webkit-scrollbar-track { background: var(--bg-chassis); }
+    ::-webkit-scrollbar-thumb { background: #262c38; border-radius: 2px; }
+    ::-webkit-scrollbar-thumb:hover { background: #374151; }
+
+    /* Crisp 4px flat instrumentation buttons */
+    .btn-inst {
+      background: var(--bg-elevated);
+      border: 1px solid var(--border-hairline);
+      color: var(--text-primary);
+      border-radius: 4px;
+      padding: 4px 8px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background-color 0.08s ease, border-color 0.08s ease;
+      white-space: nowrap;
+      user-select: none;
+    }
+    .btn-inst:hover {
+      background: var(--bg-hover);
+      border-color: var(--border-strong);
+    }
+    .btn-inst:active {
+      background: #101318;
+    }
+
+    .select-inst {
+      background: var(--bg-elevated);
+      border: 1px solid var(--border-hairline);
+      color: var(--text-primary);
+      border-radius: 4px;
+      padding: 4px 6px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      outline: none;
+      cursor: pointer;
+    }
+    .select-inst:hover, .select-inst:focus {
+      border-color: var(--border-strong);
+    }
+
+    /* Tactile hardware switches */
+    .mech-switch {
+      position: relative;
+      overflow: hidden;
+      border-radius: 4px;
+      border: 1px solid var(--border-strong);
+      background: #161a22;
+      transition: transform 0.04s ease, background-color 0.08s ease;
+      user-select: none;
+      -webkit-tap-highlight-color: transparent;
+      cursor: pointer;
+    }
+    .mech-switch:active {
+      transform: translateY(1px);
+      background: #0f1218;
+    }
+    .mech-switch-sos {
+      border-color: rgba(239, 68, 68, 0.55);
+      background: #231215;
+    }
+    .mech-switch-sos:hover { background: #2c1519; }
+    .mech-switch-sos:active { background: #190c0e; }
+
+    /* Pixel-accurate 2x integer-scaled 128x64 OLED */
+    .oled-screen-wrap {
+      position: relative;
+      width: 256px;
+      height: 128px;
+      background: #05070a;
+      border: 1px solid #2b3240;
+      border-radius: 2px;
+      overflow: hidden;
+      margin: 0 auto;
+    }
+    canvas#oledCanvas {
+      width: 256px;
+      height: 128px;
+      display: block;
+      image-rendering: pixelated;
+      image-rendering: crisp-edges;
+    }
+    .oled-pixel-grid {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background-image:
+        linear-gradient(to right, rgba(5, 7, 10, 0.26) 1px, transparent 1px),
+        linear-gradient(to bottom, rgba(5, 7, 10, 0.26) 1px, transparent 1px);
+      background-size: 2px 2px;
+    }
+
+    kbd {
+      background: #181c24;
+      border: 1px solid #323949;
+      border-radius: 3px;
+      padding: 1px 4px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px;
+      color: #e5e7eb;
+    }
+  </style>
+</head>
+<body class="min-h-screen lg:h-screen lg:overflow-hidden flex flex-col">
+
+  <!-- ==================== 44PX TOP UTILITY BAR ==================== -->
+  <header class="min-h-[44px] bg-[#12151b] border-b border-[#232833] px-3 py-1.5 flex flex-wrap items-center justify-between gap-2 shrink-0">
+    <!-- Left: Brand + Preset Scenario -->
+    <div class="flex items-center gap-2.5">
+      <div class="flex items-center gap-2">
+        <span class="w-2 h-2 rounded-full bg-[#10b981]"></span>
+        <span class="mono font-bold text-[13px] tracking-tight text-[#e5e7eb]">LASTLINK</span>
+        <span class="mono text-[11px] text-[#8b949e] hidden xl:inline">433 MHz LoRa Mesh</span>
+      </div>
+      <div class="h-4 w-[1px] bg-[#232833]"></div>
+      <div class="flex items-center gap-1.5">
+        <span class="mono text-[10px] uppercase tracking-wider text-[#8b949e] hidden md:inline">Scenario</span>
+        <select id="scenarioSelect" onchange="applyScenario(this.value)" class="select-inst">
+          <option value="los4">4-Node LOS</option>
+          <option value="canyon">Urban Multi-Hop</option>
+          <option value="grid6">6-Node Grid</option>
+          <option value="failover">Relay Failover</option>
+        </select>
+      </div>
+    </div>
+
+    <!-- Center: Dynamic Node Scaling & RF Blocker Controls -->
+    <div class="flex flex-wrap items-center gap-1.5">
+      <button onclick="addMeshNode()" class="btn-inst text-[#e5e7eb]" title="Add Symmetric Handheld Node (Max 8)">+ Node</button>
+      <button onclick="removeLastMeshNode()" class="btn-inst text-[#8b949e]" title="Remove Highest-ID Node (Min 2)">- Node</button>
+      <div class="h-4 w-[1px] bg-[#232833] mx-0.5"></div>
+      <select id="blockerPresetSelect" class="select-inst text-[#e5e7eb]">
+        <option value="wall">Wall -18dB</option>
+        <option value="building">Building -28dB</option>
+        <option value="ridge">Ridge -35dB</option>
+        <option value="shield">Shield -55dB</option>
+      </select>
+      <button onclick="addBlockerFromPreset()" class="btn-inst text-[#f59e0b]">+ Blocker</button>
+      <button id="btnDeleteSelectedBlocker" onclick="deleteSelectedBlocker()" class="hidden btn-inst text-[#ef4444]">Del Blocker</button>
+      <button onclick="clearAllBlockers()" class="btn-inst text-[#8b949e]">Clear Obstacles</button>
+    </div>
+
+    <!-- Right: Global Controls & Guide -->
+    <div class="flex items-center gap-1.5">
+      <button onclick="triggerTripleSosDirect()" class="btn-inst border-[#ef4444]/50 text-[#ef4444] hover:bg-[#ef4444]/10 font-semibold">
+        Trigger 3x SOS
+      </button>
+      <button id="btnGlobalSF" onclick="toggleGlobalSF()" class="btn-inst text-[#38bdf8]">
+        SF7 / BW125
+      </button>
+      <button id="btnAudioMute" onclick="toggleAudioMute()" class="btn-inst text-[#e5e7eb]">
+        Audio: ON
+      </button>
+      <button onclick="resetWorkbench()" class="btn-inst text-[#8b949e]">
+        Reset
+      </button>
+      <button onclick="openGuideModal()" class="btn-inst border-[#38bdf8]/60 bg-[#38bdf8]/10 text-[#38bdf8] font-semibold">
+        ? Guide
+      </button>
+    </div>
+  </header>
+
+  <!-- ==================== MAIN 3-ZONE INSTRUMENT WORKBENCH ==================== -->
+  <main class="flex-1 flex flex-col lg:flex-row min-h-0 overflow-y-auto lg:overflow-hidden">
+
+    <!-- ==================== LEFT DOCK: 300PX HANDHELD UNIT ==================== -->
+    <aside class="w-full lg:w-[300px] shrink-0 bg-[#12151b] border-b lg:border-b-0 lg:border-r border-[#232833] flex flex-col justify-between p-3 gap-3 overflow-y-auto">
+      <div class="flex flex-col gap-3">
+        <!-- Active Unit Tabs (N01..N08) -->
+        <div>
+          <div class="flex items-center justify-between mb-1.5">
+            <span class="mono text-[10px] uppercase tracking-wider text-[#8b949e]">Active Unit (<span id="nodeCountLabel">4/8</span>)</span>
+            <span id="selectedNodeStatus" class="mono text-[10px] text-[#10b981]">NODE01 ONLINE</span>
+          </div>
+          <div id="nodeSelectorGrid" class="grid grid-cols-4 gap-1"></div>
+        </div>
+
+        <!-- SSD1306 128x64 OLED Housing -->
+        <div class="bg-[#0b0d10] border border-[#232833] rounded-[4px] p-2.5">
+          <div class="flex items-center justify-between mb-2">
+            <div class="flex items-center gap-1.5">
+              <span id="hwStatusLed" class="w-2 h-2 rounded-full bg-[#232833]"></span>
+              <span class="mono text-[10px] text-[#8b949e]">GPIO33</span>
+            </div>
+            <div class="flex items-center gap-2 mono text-[10px] text-[#8b949e]">
+              <span>SSD1306 128×64</span>
+              <span id="hwGpsTag" class="text-[#10b981]">GPS</span>
+            </div>
+          </div>
+
+          <div class="oled-screen-wrap">
+            <canvas id="oledCanvas" width="128" height="64"></canvas>
+            <div class="oled-pixel-grid"></div>
+            <div id="poweredOffOverlay" class="hidden absolute inset-0 bg-[#05070a] flex flex-col items-center justify-center mono text-[11px] text-[#8b949e]">
+              <span>POWER OFF</span>
+              <span class="text-[9px] text-[#4b5563] mt-0.5">Toggle Power ON below</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tactile 3-Button Controller -->
+        <div>
+          <div class="flex items-center justify-between mb-1.5">
+            <span class="mono text-[10px] uppercase tracking-wider text-[#8b949e]">Tactile Switches</span>
+            <span class="mono text-[10px] text-[#8b949e]">Hold SEL 750ms = Back</span>
+          </div>
+          <div class="grid grid-cols-3 gap-1.5">
+            <button id="physBtnSos" class="mech-switch mech-switch-sos py-2 px-1.5 flex flex-col items-center justify-center" title="1x: Backspace/Cancel | 3x: SOS">
+              <span class="mono text-[11px] font-bold text-[#ef4444]">RED / SOS</span>
+              <span class="mono text-[9px] text-[#8b949e] mt-0.5">GPIO 32</span>
+            </button>
+
+            <button id="physBtnSel" class="mech-switch py-2 px-1.5 flex flex-col items-center justify-center" title="Short: Confirm | Long 750ms: Back/Send">
+              <div id="selHoldBar" class="absolute bottom-0 left-0 h-[2px] bg-[#38bdf8] w-0"></div>
+              <span class="mono text-[11px] font-semibold text-[#e5e7eb]">SELECT</span>
+              <span class="mono text-[9px] text-[#8b949e] mt-0.5">GPIO 4</span>
+            </button>
+
+            <button id="physBtnNext" class="mech-switch py-2 px-1.5 flex flex-col items-center justify-center" title="Short: Next | Hold: Keyboard Turbo">
+              <span class="mono text-[11px] font-semibold text-[#e5e7eb]">NEXT</span>
+              <span class="mono text-[9px] text-[#8b949e] mt-0.5">GPIO 15</span>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Unit Hardware State Toggles -->
+      <div class="bg-[#0b0d10] border border-[#232833] rounded-[4px] p-2.5 flex flex-col gap-2">
+        <div class="mono text-[10px] uppercase tracking-wider text-[#8b949e] border-b border-[#232833] pb-1">
+          Unit Hardware State
+        </div>
+
+        <div class="flex items-center justify-between">
+          <span class="mono text-[11px] text-[#8b949e]">Power</span>
+          <button id="btnTogglePower" onclick="toggleSelectedNodePower()" class="btn-inst text-[#10b981] border-[#10b981]/40">ON</button>
+        </div>
+
+        <div class="flex items-center justify-between">
+          <span class="mono text-[11px] text-[#8b949e]">NEO-6M GPS (UART2)</span>
+          <button id="btnToggleGps" onclick="toggleSelectedNodeGps()" class="btn-inst text-[#10b981] border-[#10b981]/40">Attached</button>
+        </div>
+
+        <div class="flex items-center justify-between">
+          <span class="mono text-[11px] text-[#8b949e]">Wi-Fi AP (192.168.4.1)</span>
+          <button id="btnToggleWifi" onclick="toggleSelectedNodeWifi()" class="btn-inst text-[#8b949e]">OFF</button>
+        </div>
+
+        <div class="flex items-center justify-between">
+          <span class="mono text-[11px] text-[#8b949e]">Light Sleep</span>
+          <button id="btnToggleSleep" onclick="toggleSelectedNodeSleep()" class="btn-inst text-[#8b949e]">Active</button>
+        </div>
+
+        <div class="pt-1 border-t border-[#232833]">
+          <div class="flex justify-between mono text-[10px] text-[#8b949e] mb-1">
+            <span>18650 Cell (GPIO 34)</span>
+            <span id="batReadout" class="text-[#e5e7eb]">91% (4.12V)</span>
+          </div>
+          <input id="batSlider" type="range" min="4" max="100" value="91" oninput="setSelectedNodeBattery(this.value)"
+            class="w-full h-1 bg-[#232833] rounded-none appearance-none cursor-pointer accent-[#38bdf8]" />
+        </div>
+      </div>
+    </aside>
+
+    <!-- ==================== CENTER STAGE: PAN/ZOOM RF TERRAIN CANVAS ==================== -->
+    <section class="flex-1 min-h-[400px] bg-[#0b0d10] relative flex flex-col overflow-hidden">
+      <canvas id="meshCanvas" class="w-full h-full block cursor-grab active:cursor-grabbing"></canvas>
+
+      <!-- Top-Left RF Parameters HUD -->
+      <div class="absolute top-2.5 left-2.5 bg-[#12151b]/95 border border-[#232833] rounded-[4px] px-2.5 py-1.5 mono text-[10px] text-[#8b949e] pointer-events-none flex flex-wrap items-center gap-3">
+        <span>SENS: <strong id="canvasSensReadout" class="text-[#38bdf8]">-123 dBm (SF7)</strong></span>
+        <span>NOISE: <strong class="text-[#e5e7eb]">-118 dBm</strong></span>
+        <span id="canvasCoordsReadout">NODE01: 13.9888°N, 74.5540°E</span>
+      </div>
+
+      <!-- Top-Right Packet Wave Legend -->
+      <div class="absolute top-2.5 right-2.5 bg-[#12151b]/95 border border-[#232833] rounded-[4px] px-2.5 py-1.5 mono text-[10px] text-[#8b949e] pointer-events-none hidden sm:flex items-center gap-3">
+        <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-[#ef4444]"></span>SOS</span>
+        <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-[#10b981]"></span>DATA</span>
+        <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-[#f59e0b]"></span>ACK</span>
+        <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-[#38bdf8]"></span>PING</span>
+      </div>
+
+      <!-- Dismissible First-Timer Quick-Hint Bar (Bottom Center) -->
+      <div id="canvasQuickHintBar" class="absolute bottom-11 left-1/2 -translate-x-1/2 bg-[#12151b]/95 border border-[#323949] rounded-[4px] px-3 py-1.5 mono text-[10px] text-[#e5e7eb] flex items-center gap-2.5 max-w-[92%] whitespace-nowrap overflow-x-auto">
+        <span class="text-[#38bdf8] font-semibold">HINT:</span>
+        <span>Drag canvas to pan • Scroll to zoom • Drag nodes &amp; blockers • Right-click blocker to delete</span>
+        <button onclick="openGuideModal()" class="text-[#38bdf8] underline hover:text-white cursor-pointer ml-1">Open Guide</button>
+        <button onclick="dismissQuickHint()" class="text-[#8b949e] hover:text-white cursor-pointer pl-1">✕</button>
+      </div>
+
+      <!-- Bottom-Left Scale Ruler + North Compass + Link Counter -->
+      <div class="absolute bottom-2.5 left-2.5 bg-[#12151b]/95 border border-[#232833] rounded-[4px] px-2.5 py-1.5 mono text-[10px] text-[#8b949e] pointer-events-none flex items-center gap-3">
+        <div class="flex items-center gap-1.5">
+          <span class="font-bold text-[#e5e7eb]">N↑</span>
+          <div class="flex flex-col items-center">
+            <span id="scaleBarLabel" class="text-[9px] text-[#e5e7eb] leading-none mb-0.5">100m</span>
+            <div id="scaleBarLine" class="h-[4px] border-x border-b border-[#e5e7eb]" style="width: 40px;"></div>
+          </div>
+        </div>
+        <div class="h-3.5 w-[1px] bg-[#232833]"></div>
+        <span id="canvasLinksReadout">LINKS: 2/3 VIABLE</span>
+        <span class="hidden sm:inline">TRAFFIC: <strong id="canvasTrafficReadout" class="text-[#e5e7eb]">0 TX / 0 RLY</strong></span>
+      </div>
+
+      <!-- Bottom-Right Zoom & Viewport Fit Controls -->
+      <div class="absolute bottom-2.5 right-2.5 bg-[#12151b]/95 border border-[#232833] rounded-[4px] p-1 flex items-center gap-1">
+        <button onclick="zoomMapBy(1.2)" class="btn-inst py-0.5 px-2 text-[11px]" title="Zoom In (+)">+</button>
+        <span id="zoomLevelReadout" class="mono text-[10px] text-[#8b949e] px-1.5">100%</span>
+        <button onclick="zoomMapBy(1 / 1.2)" class="btn-inst py-0.5 px-2 text-[11px]" title="Zoom Out (-)">−</button>
+        <button onclick="fitMapToNodes()" class="btn-inst py-0.5 px-2 text-[10px] text-[#38bdf8]" title="Center & Fit All Nodes">Fit</button>
+      </div>
+    </section>
+
+    <!-- ==================== RIGHT INSPECTOR: 340PX SEGMENTED TABS ==================== -->
+    <aside class="w-full lg:w-[340px] shrink-0 bg-[#12151b] border-t lg:border-t-0 lg:border-l border-[#232833] flex flex-col min-h-[360px] overflow-hidden">
+      <!-- Segmented 3-Tab Header -->
+      <div class="grid grid-cols-3 border-b border-[#232833] bg-[#0b0d10] shrink-0">
+        <button id="tabBtnPortal" onclick="switchInspectorTab('portal')" class="py-2 px-1.5 mono text-[11px] font-semibold border-b-2 border-[#38bdf8] text-[#e5e7eb] bg-[#12151b] cursor-pointer">
+          192.168.4.1
+        </button>
+        <button id="tabBtnPacket" onclick="switchInspectorTab('packet')" class="py-2 px-1.5 mono text-[11px] font-medium border-b-2 border-transparent text-[#8b949e] hover:text-[#e5e7eb] cursor-pointer">
+          44B Frame
+        </button>
+        <button id="tabBtnPower" onclick="switchInspectorTab('power')" class="py-2 px-1.5 mono text-[11px] font-medium border-b-2 border-transparent text-[#8b949e] hover:text-[#e5e7eb] cursor-pointer">
+          RF &amp; Power
+        </button>
+      </div>
+
+      <!-- TAB 1: 192.168.4.1 EMBEDDED WEB SERVER PORTAL -->
+      <div id="tabPortal" class="p-3 flex-1 overflow-y-auto flex flex-col gap-3">
+        <div class="bg-[#0b0d10] border border-[#232833] rounded-[4px] p-2.5 flex items-center justify-between">
+          <div>
+            <div class="mono text-[11px] font-semibold text-[#e5e7eb]" id="portalApTitle">SSID: LASTLINK_NODE01</div>
+            <div class="mono text-[10px] text-[#8b949e] mt-0.5" id="portalApMeta">http://192.168.4.1 • TX 11 dBm</div>
+          </div>
+          <button id="portalQuickApToggle" onclick="toggleSelectedNodeWifi()" class="btn-inst text-[#8b949e]">
+            Enable AP
+          </button>
+        </div>
+
+        <div id="portalOfflineNotice" class="bg-[#0b0d10] border border-[#232833] rounded-[4px] p-3 mono text-[11px] text-[#8b949e]">
+          SoftAP disabled on <span id="portalOfflineNodeName" class="text-[#e5e7eb]">NODE01</span>. Enable via <span class="text-[#38bdf8]">Settings → 6. WiFiAP</span> or click <span class="text-[#e5e7eb]">Enable AP</span> above.
+        </div>
+
+        <div id="portalActiveContent" class="hidden flex-col gap-3">
+          <form onsubmit="handleWebDispatch(event)" class="bg-[#0b0d10] border border-[#232833] rounded-[4px] p-2.5">
+            <div class="mono text-[10px] uppercase tracking-wider text-[#8b949e] mb-1.5">Web-to-LoRa Dispatch (16 Char Max)</div>
+            <div class="flex gap-1.5">
+              <input id="webDispatchInput" type="text" maxlength="16" placeholder="BROADCAST MSG"
+                class="flex-1 bg-[#181c24] border border-[#232833] focus:border-[#38bdf8] rounded-[4px] px-2 py-1 mono text-[11px] text-[#e5e7eb] uppercase outline-none" />
+              <button type="submit" class="btn-inst bg-[#10b981]/15 border-[#10b981]/50 text-[#10b981] font-semibold">
+                Send
+              </button>
+            </div>
+          </form>
+
+          <div class="bg-[#0b0d10] border border-[#232833] rounded-[4px] p-2.5">
+            <div class="mono text-[10px] uppercase tracking-wider text-[#8b949e] mb-1.5">Discovered Mesh Nodes</div>
+            <table class="w-full text-left border-collapse mono text-[10px]">
+              <thead>
+                <tr class="border-b border-[#232833] text-[#8b949e]">
+                  <th class="py-1 pr-1.5">Node</th>
+                  <th class="py-1 pr-1.5">RSSI</th>
+                  <th class="py-1 pr-1.5">Bat</th>
+                  <th class="py-1">Coordinates</th>
+                </tr>
+              </thead>
+              <tbody id="portalNodesTbody" class="divide-y divide-[#232833]/60"></tbody>
+            </table>
+          </div>
+
+          <div class="bg-[#0b0d10] border border-[#232833] rounded-[4px] p-2.5">
+            <div class="flex items-center justify-between mb-1.5">
+              <span class="mono text-[10px] uppercase tracking-wider text-[#8b949e]">Triage &amp; Inbox Log</span>
+              <span id="portalInboxCount" class="mono text-[10px] text-[#8b949e]">0</span>
+            </div>
+            <div id="portalInboxList" class="flex flex-col gap-1.5 max-h-[220px] overflow-y-auto"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB 2: 44-BYTE PACKET & FNV-1A DISSECTOR -->
+      <div id="tabPacket" class="hidden p-3 flex-1 overflow-y-auto flex flex-col gap-3 mono">
+        <div class="flex items-center justify-between">
+          <span class="text-[10px] uppercase tracking-wider text-[#8b949e]">Air Traffic Capture (44B Frames)</span>
+          <button onclick="clearPacketLog()" class="btn-inst text-[10px] py-0.5 px-2 text-[#8b949e]">Clear</button>
+        </div>
+
+        <div id="packetLogList" class="flex flex-col gap-1 max-h-[155px] overflow-y-auto bg-[#0b0d10] border border-[#232833] rounded-[4px] p-1.5 text-[10px]">
+          <div class="text-[#8b949e] text-center py-3">Awaiting RF packet capture...</div>
+        </div>
+
+        <div class="bg-[#0b0d10] border border-[#232833] rounded-[4px] p-2.5">
+          <div class="flex items-center justify-between border-b border-[#232833] pb-1 mb-2 text-[10px]">
+            <span class="font-semibold text-[#38bdf8]">LoRaPacket (packed, 44B)</span>
+            <span class="text-[#8b949e]">SECRET 0xA55A9C39</span>
+          </div>
+          <div id="packetFieldsGrid" class="grid grid-cols-2 gap-x-2 gap-y-1 text-[10px]">
+            <div class="text-[#8b949e] col-span-2">Select a frame above to inspect fields.</div>
+          </div>
+        </div>
+
+        <div class="bg-[#0b0d10] border border-[#232833] rounded-[4px] p-2.5">
+          <div class="text-[10px] text-[#8b949e] mb-1">RAW HEX (0x00..0x2B)</div>
+          <pre id="packetHexDump" class="text-[10px] text-[#e5e7eb] leading-relaxed whitespace-pre-wrap break-all m-0">--</pre>
+        </div>
+      </div>
+
+      <!-- TAB 3: LINK & POWER BUDGET -->
+      <div id="tabPower" class="hidden p-3 flex-1 overflow-y-auto flex flex-col gap-3 mono">
+        <div class="bg-[#0b0d10] border border-[#232833] rounded-[4px] p-2.5">
+          <div class="flex items-center justify-between mb-1.5">
+            <span class="text-[10px] uppercase tracking-wider text-[#8b949e]">Pairwise RF Link Budget</span>
+            <span id="rfMatrixSourceTag" class="text-[10px] text-[#38bdf8]">FROM NODE01</span>
+          </div>
+          <table class="w-full text-left border-collapse text-[10px]">
+            <thead>
+              <tr class="border-b border-[#232833] text-[#8b949e]">
+                <th class="py-1 pr-1">Peer</th>
+                <th class="py-1 pr-1">Dist</th>
+                <th class="py-1 pr-1">Loss</th>
+                <th class="py-1 pr-1">RSSI/SNR</th>
+                <th class="py-1">State</th>
+              </tr>
+            </thead>
+            <tbody id="rfMatrixTbody" class="divide-y divide-[#232833]/60"></tbody>
+          </table>
+        </div>
+
+        <div class="bg-[#0b0d10] border border-[#232833] rounded-[4px] p-2.5">
+          <div class="flex items-center justify-between mb-1.5">
+            <span class="text-[10px] uppercase tracking-wider text-[#8b949e]">18650 (3000 mAh) Power Profile</span>
+            <span id="powerNodeTag" class="text-[10px] text-[#e5e7eb]">NODE01</span>
+          </div>
+          <div id="powerBreakdownList" class="flex flex-col gap-1.5 text-[10px]"></div>
+        </div>
+      </div>
+    </aside>
+  </main>
+
+  <!-- ==================== FIRST-TIMER HELP / GUIDE MODAL ==================== -->
+  <div id="guideModal" class="hidden fixed inset-0 z-50 bg-black/75 flex items-center justify-center p-4">
+    <div class="w-full max-w-[660px] bg-[#12151b] border border-[#323949] rounded-[4px] flex flex-col max-h-[88vh] overflow-hidden">
+      <!-- Modal Header -->
+      <div class="px-4 py-2.5 bg-[#0b0d10] border-b border-[#232833] flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <span class="w-2 h-2 rounded-full bg-[#38bdf8]"></span>
+          <span class="mono font-bold text-[12px] text-[#e5e7eb]">LASTLINK DIGITAL TWIN // OPERATOR MANUAL</span>
+        </div>
+        <button onclick="closeGuideModal()" class="btn-inst py-0.5 px-2 text-[#8b949e] hover:text-white">ESC / Close</button>
+      </div>
+
+      <!-- Guide Tabs -->
+      <div class="grid grid-cols-3 border-b border-[#232833] bg-[#0b0d10] shrink-0">
+        <button id="guideTabBtn1" onclick="switchGuideTab(1)" class="py-2 px-2 mono text-[11px] font-semibold border-b-2 border-[#38bdf8] text-[#e5e7eb] bg-[#12151b] cursor-pointer">
+          1. Quick-Start Walkthrough
+        </button>
+        <button id="guideTabBtn2" onclick="switchGuideTab(2)" class="py-2 px-2 mono text-[11px] font-medium border-b-2 border-transparent text-[#8b949e] hover:text-[#e5e7eb] cursor-pointer">
+          2. 3-Button &amp; Key Controls
+        </button>
+        <button id="guideTabBtn3" onclick="switchGuideTab(3)" class="py-2 px-2 mono text-[11px] font-medium border-b-2 border-transparent text-[#8b949e] hover:text-[#e5e7eb] cursor-pointer">
+          3. Mesh &amp; RF Mechanics
+        </button>
+      </div>
+
+      <!-- Guide Body -->
+      <div class="p-4 overflow-y-auto flex-1 text-[12px] text-[#e5e7eb]">
+        <!-- Tab 1: Quick-Start -->
+        <div id="guideTab1" class="flex flex-col gap-3">
+          <p class="text-[#8b949e]">This workbench is a live digital twin of your 433 MHz ESP32 + LoRa mesh handheld firmware (SSOT v3.0). Every node runs the exact 12-state OLED interface, controlled-flooding router, and embedded <span class="mono text-[#e5e7eb]">192.168.4.1</span> web server.</p>
+
+          <div class="bg-[#0b0d10] border border-[#232833] rounded-[4px] p-3 flex flex-col gap-2.5">
+            <div class="flex items-start justify-between gap-3">
+              <div>
+                <div class="mono font-semibold text-[#38bdf8]">STEP 1 — Operate the OLED Handset (Left Dock)</div>
+                <div class="text-[#8b949e] text-[11px] mt-0.5">Select any node (<span class="mono text-[#e5e7eb]">N01–N08</span>) and use <span class="mono text-[#e5e7eb]">NEXT</span>, <span class="mono text-[#e5e7eb]">SELECT</span>, and <span class="mono text-[#ef4444]">RED / SOS</span> to open <span class="mono text-[#e5e7eb]">MESH NET</span>, send presets, or view <span class="mono text-[#e5e7eb]">RESCUE</span> radar.</div>
+              </div>
+              <button onclick="runDemoRollCall()" class="btn-inst border-[#38bdf8]/50 text-[#38bdf8] shrink-0">Try Roll-Call</button>
+            </div>
+
+            <div class="border-t border-[#232833] pt-2.5 flex items-start justify-between gap-3">
+              <div>
+                <div class="mono font-semibold text-[#10b981]">STEP 2 — Pan, Zoom &amp; Test Multi-Hop Routing (Center Map)</div>
+                <div class="text-[#8b949e] text-[11px] mt-0.5">Drag empty canvas to pan, scroll wheel to zoom, drag nodes apart, or place RF blockers (<span class="mono text-[#f59e0b]">+ Blocker</span>) between N01 and N04 to watch N02/N03 automatically relay packets (<span class="mono text-[#e5e7eb]">[SENT] → [RELAY] → [ACK]</span>).</div>
+              </div>
+              <button onclick="runDemoMultiHop()" class="btn-inst border-[#10b981]/50 text-[#10b981] shrink-0">Try Multi-Hop</button>
+            </div>
+
+            <div class="border-t border-[#232833] pt-2.5 flex items-start justify-between gap-3">
+              <div>
+                <div class="mono font-semibold text-[#f59e0b]">STEP 3 — Inspect 44-Byte Frames &amp; Web Portal (Right Dock)</div>
+                <div class="text-[#8b949e] text-[11px] mt-0.5">Switch tabs on the right to dispatch messages from <span class="mono text-[#e5e7eb]">192.168.4.1</span>, inspect the 44-byte binary hex &amp; FNV-1a MAC tag, or check pairwise link budgets.</div>
+              </div>
+              <button onclick="runDemoSosAlert()" class="btn-inst border-[#ef4444]/50 text-[#ef4444] shrink-0">Try SOS Beacon</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Tab 2: 3-Button & Keyboard Grammar -->
+        <div id="guideTab2" class="hidden flex-col gap-3">
+          <table class="w-full text-left border-collapse mono text-[11px]">
+            <thead>
+              <tr class="border-b border-[#232833] text-[#8b949e]">
+                <th class="py-1.5 pr-2">Hardware Switch</th>
+                <th class="py-1.5 pr-2">Key Shortcut</th>
+                <th class="py-1.5">Firmware Action</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-[#232833]">
+              <tr>
+                <td class="py-2 pr-2 font-semibold text-[#e5e7eb]">NEXT (GPIO 15)</td>
+                <td class="py-2 pr-2"><kbd>N</kbd> or <kbd>→</kbd></td>
+                <td class="py-2 text-[#8b949e]">Advance cursor, scroll menus/inbox, or cycle Rescue targets.</td>
+              </tr>
+              <tr>
+                <td class="py-2 pr-2 font-semibold text-[#e5e7eb]">SELECT (GPIO 4)</td>
+                <td class="py-2 pr-2"><kbd>Enter</kbd></td>
+                <td class="py-2 text-[#8b949e]">Confirm item, toggle setting, or lock keyboard row/character.</td>
+              </tr>
+              <tr>
+                <td class="py-2 pr-2 font-semibold text-[#38bdf8]">SELECT Hold (750ms)</td>
+                <td class="py-2 pr-2"><kbd>Shift</kbd>+<kbd>Enter</kbd></td>
+                <td class="py-2 text-[#8b949e]">Universal <strong class="text-[#e5e7eb]">Back</strong> or <strong class="text-[#e5e7eb]">Send/Save</strong> inside the 4×7 keyboard.</td>
+              </tr>
+              <tr>
+                <td class="py-2 pr-2 font-semibold text-[#ef4444]">RED / SOS (1x Click)</td>
+                <td class="py-2 pr-2"><kbd>Esc</kbd> / <kbd>Bksp</kbd></td>
+                <td class="py-2 text-[#8b949e]">Backspace in keyboard, cancel SOS countdown, or dismiss alert.</td>
+              </tr>
+              <tr>
+                <td class="py-2 pr-2 font-semibold text-[#ef4444]">RED / SOS (3x Click)</td>
+                <td class="py-2 pr-2"><kbd>X</kbd></td>
+                <td class="py-2 text-[#8b949e]">Global emergency interrupt from any screen (including sleep).</td>
+              </tr>
+              <tr>
+                <td class="py-2 pr-2 font-semibold text-[#e5e7eb]">Map &amp; Unit Controls</td>
+                <td class="py-2 pr-2"><kbd>1</kbd>–<kbd>8</kbd>, <kbd>Del</kbd></td>
+                <td class="py-2 text-[#8b949e]">Switch active node (<kbd>1–8</kbd>); delete selected blocker (<kbd>Del</kbd> or right-click).</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Tab 3: Mesh & RF Mechanics -->
+        <div id="guideTab3" class="hidden flex-col gap-2.5 text-[11px] text-[#8b949e]">
+          <div class="bg-[#0b0d10] border border-[#232833] rounded-[4px] p-2.5">
+            <div class="mono font-semibold text-[#e5e7eb] mb-1">1. Controlled Flooding &amp; Overhear Suppression</div>
+            <p>Each node caches the last 32 <span class="mono text-[#e5e7eb]">(srcId, msgId)</span> pairs. When forwarding a packet with <span class="mono text-[#e5e7eb]">ttl &gt; 0</span>, nodes wait a randomized <span class="mono text-[#e5e7eb]">90–280 ms</span> jitter window. If another neighbor rebroadcasts the same packet first, the node cancels its redundant relay to save airtime.</p>
+          </div>
+          <div class="bg-[#0b0d10] border border-[#232833] rounded-[4px] p-2.5">
+            <div class="mono font-semibold text-[#e5e7eb] mb-1">2. Dual-Mode Rescue Radar (GPS Vector vs. Indoor RSSI)</div>
+            <p>Open <span class="mono text-[#e5e7eb]">RESCUE</span> on the OLED. When both local and target nodes have <span class="mono text-[#10b981]">NEO-6M GPS</span> attached, the radar computes exact Haversine distance and compass bearing. If either unit has GPS detached, it automatically switches to a 28-sample RSSI sparkline and path-loss distance estimator.</p>
+          </div>
+          <div class="bg-[#0b0d10] border border-[#232833] rounded-[4px] p-2.5">
+            <div class="mono font-semibold text-[#e5e7eb] mb-1">3. Silent Light Sleep Wakeup</div>
+            <p>Toggle <span class="mono text-[#e5e7eb]">Light Sleep</span> on a node (<span class="mono text-[#f59e0b]">0.8 mA</span>). When another node opens <span class="mono text-[#e5e7eb]">MESH NET</span> or sends a multi-hop message, the sleeping node wakes via <span class="mono text-[#e5e7eb]">DIO0</span>, replies/relays silently without lighting its OLED, and returns to sleep.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Modal Footer -->
+      <div class="px-4 py-2.5 bg-[#0b0d10] border-t border-[#232833] flex items-center justify-between">
+        <span class="mono text-[10px] text-[#8b949e]">SSOT v3.0 • Symmetric Peer-to-Peer Architecture</span>
+        <button onclick="closeGuideModal()" class="btn-inst bg-[#38bdf8]/15 border-[#38bdf8]/50 text-[#38bdf8] font-semibold">Start Exploring</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // =========================================================================
+    // 1. SSOT v3.0 CONSTANTS & PROTOCOL DEFINITIONS
+    // =========================================================================
+    const MESH_SECRET = 0xA55A9C39 >>> 0;
+    const MAX_NODES = 8;
+
+    const PKT = {
+      SOS:       0x01,
+      PRESET:    0x02,
+      TEXT:      0x03,
+      ACK:       0x04,
+      RANGETEST: 0x06,
+      HEARTBEAT: 0x55,
+      ROLLCALL:  0xA5,
+      PRESENT:   0x5A
+    };
+
+    const PKT_NAMES = {
+      0x01: 'PKT_SOS',
+      0x02: 'PKT_PRESET',
+      0x03: 'PKT_TEXT',
+      0x04: 'PKT_ACK',
+      0x06: 'PKT_RANGETEST',
+      0x55: 'PKT_HEARTBEAT',
+      0xA5: 'PKT_ROLLCALL',
+      0x5A: 'PKT_PRESENT'
+    };
+
+    const SCR = {
+      HOME: 0,
+      MESH: 1,
+      MSG_MENU: 2,
+      TARGET_PICK: 3,
+      KEYBOARD: 4,
+      PRESETS: 5,
+      INBOX: 6,
+      RESCUE: 7,
+      SETTINGS: 8,
+      RANGETEST: 9,
+      SOS_COUNTDOWN: 10,
+      TX_STATUS: 11,
+      INCOMING_ALERT: 12,
+      SLEEPING: 13
+    };
+
+    const PRESET_LABELS = [
+      'NEED HELP!',
+      'MEDICAL!',
+      'TRAPPED!',
+      'NEED WATER',
+      'NEED FOOD',
+      'I AM SAFE'
+    ];
+
+    const KB_MAP = [
+      ['A','B','C','D','E','F','G'],
+      ['H','I','J','K','L','M','N'],
+      ['O','P','Q','R','S','T','U'],
+      ['V','W','X','Y','Z',' ','\n']
+    ];
+
+    const SLEEP_TIMES = [15000, 30000, 60000, 0];
+
+    const BLOCKER_PRESETS = {
+      wall:     { label: 'WALL',     lossDb: 18, w: 28, h: 120 },
+      building: { label: 'BUILDING', lossDb: 28, w: 72, h: 90  },
+      ridge:    { label: 'RIDGE',    lossDb: 35, w: 92, h: 106 },
+      shield:   { label: 'SHIELD',   lossDb: 55, w: 24, h: 135 }
+    };
+
+    const BASE_LAT = 13.9885000;
+    const BASE_LON = 74.5562000;
+    const METERS_PER_PX = 2.5; // 40 world px = 100m
+
+    // =========================================================================
+    // 2. WEBAUDIO PASSIVE BUZZER SYNTHESIZER (LEDC PWM REPLICA)
+    // =========================================================================
+    let audioCtx = null;
+    let globalAudioEnabled = true;
+
+    function ensureAudio() {
+      if (!audioCtx && globalAudioEnabled) {
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        if (AudioContext) audioCtx = new AudioContext();
+      }
+      if (audioCtx && audioCtx.state === 'suspended') {
+        audioCtx.resume();
+      }
+    }
+
+    function playToneSeq(notes, nodeBuzzerOn = true) {
+      if (!globalAudioEnabled || !nodeBuzzerOn) return;
+      ensureAudio();
+      if (!audioCtx) return;
+
+      let offset = 0;
+      notes.forEach(n => {
+        if (n.freq > 0) {
+          const osc = audioCtx.createOscillator();
+          const gain = audioCtx.createGain();
+          osc.type = 'square';
+          osc.frequency.setValueAtTime(n.freq, audioCtx.currentTime + offset);
+          gain.gain.setValueAtTime(0.03, audioCtx.currentTime + offset);
+          gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + offset + (n.ms / 1000));
+          osc.connect(gain);
+          gain.connect(audioCtx.destination);
+          osc.start(audioCtx.currentTime + offset);
+          osc.stop(audioCtx.currentTime + offset + (n.ms / 1000));
+        }
+        offset += (n.ms / 1000);
+      });
+    }
+
+    const Buzzer = {
+      click:   (en) => playToneSeq([{freq: 1200, ms: 16}], en),
+      confirm: (en) => playToneSeq([{freq: 1500, ms: 38}, {freq: 0, ms: 18}, {freq: 2400, ms: 60}], en),
+      error:   (en) => playToneSeq([{freq: 450, ms: 110}, {freq: 0, ms: 30}, {freq: 320, ms: 150}], en),
+      sos:     (en) => playToneSeq([
+        {freq: 2800, ms: 70}, {freq: 1900, ms: 70},
+        {freq: 2800, ms: 70}, {freq: 1900, ms: 70},
+        {freq: 2800, ms: 150}
+      ], en)
+    };
+
+    // =========================================================================
+    // 3. 44-BYTE BINARY PACKET SERIALIZER & FNV-1A AUTHENTICATION MAC
+    // =========================================================================
+    function serializePacketBytes(pkt, includeTag = false) {
+      const buf = new ArrayBuffer(44);
+      const view = new DataView(buf);
+      const u8 = new Uint8Array(buf);
+
+      view.setUint8(0, pkt.type & 0xFF);
+      view.setUint16(1, pkt.srcId & 0xFFFF, true);
+      for (let i = 0; i < 7; i++) {
+        u8[3 + i] = i < pkt.srcName.length ? pkt.srcName.charCodeAt(i) : 0;
+      }
+      view.setUint16(10, pkt.dstId & 0xFFFF, true);
+      view.setUint16(12, pkt.msgId & 0xFFFF, true);
+      view.setUint8(14, pkt.origTtl & 0xFF);
+      view.setUint8(15, pkt.ttl & 0xFF);
+      view.setUint8(16, pkt.code & 0xFF);
+      view.setUint8(17, pkt.hasGps ? 1 : 0);
+      view.setInt32(18, pkt.latE7 | 0, true);
+      view.setInt32(22, pkt.lonE7 | 0, true);
+      for (let i = 0; i < 17; i++) {
+        u8[26 + i] = i < pkt.text.length ? pkt.text.charCodeAt(i) : 0;
+      }
+      if (includeTag) {
+        view.setUint16(42, pkt.authTag & 0xFFFF, true);
+      }
+      return u8;
+    }
+
+    function computeAuthTag(pkt) {
+      const bytes = serializePacketBytes(pkt, false);
+      let hash = (2166136261 ^ MESH_SECRET) >>> 0;
+      for (let i = 0; i < 42; i++) {
+        hash ^= bytes[i];
+        hash = Math.imul(hash, 16777619) >>> 0;
+      }
+      return (((hash >>> 16) ^ (hash & 0xFFFF)) & 0xFFFF) >>> 0;
+    }
+
+    // =========================================================================
+    // 4. WORKBENCH STATE & VIEWPORT CAMERA (PAN & ZOOM)
+    // =========================================================================
+    let selectedNodeId = 1;
+    let selectedBlockerUid = null;
+    let activeInspectorTab = 'portal';
+    let globalLongRange = false;
+
+    let totalMeshTx = 0;
+    let totalMeshRelays = 0;
+    let packetHistoryLog = [];
+    let selectedPacketEntry = null;
+
+    let rfWaves = [];
+    let scheduledEvents = [];
+
+    // Camera transform for infinite pan & cursor-centered zoom
+    const cam = { x: 0, y: 0, zoom: 1.0 };
+
+    let blockerSeq = 2;
+    let obstacles = [
+      { uid: 'BLK_1', label: 'WALL',     x: 270, y: 130, w: 28, h: 120, lossDb: 18 },
+      { uid: 'BLK_2', label: 'BUILDING', x: 430, y: 210, w: 72, h: 90,  lossDb: 28 }
+    ];
+
+    function createNode(id, name, x, y, hasGpsModule) {
+      return {
+        id,
+        name,
+        x,
+        y,
+        powered: true,
+        gpsAttached: hasGpsModule,
+        gpsFix: hasGpsModule,
+        sats: hasGpsModule ? 7 : 0,
+        battery: Math.max(48, 96 - id * 5),
+        msgCounter: 1,
+
+        sleepIdx: 3, // Never in workbench unless manually toggled
+        ttl: 3,
+        longRange: globalLongRange,
+        buzzer: true,
+        wifiAP: id === 1,
+
+        dupCache: [],
+        neighbors: {},
+        inbox: [],
+        hasUnread: false,
+
+        waitingAckMsgId: 0,
+        txDeliveryStage: 0,
+        txRetriesLeft: 0,
+        sosPulseCount: 0,
+        txRetryTimer: 0,
+        lastSentPkt: null,
+        pendingRelayKey: null,
+        lastRelayedFrom: '',
+        lastRelayedBannerTime: 0,
+
+        rangeTestRunning: false,
+        rangePingSent: 0,
+        rangeAckRecv: 0,
+        rangeLastRssi: -68,
+        rangeLastSnr: 9.5,
+        lastRangePingTime: 0,
+
+        activeAlertPkt: null,
+        activeAlertRssi: 0,
+        activeAlertSnr: 0,
+        activeAlertHops: 1,
+
+        screen: SCR.HOME,
+        kbPurpose: 'MSG',
+        homeCursor: 0,
+        msgMenuCursor: 0,
+        settingsCursor: 0,
+        presetCursor: 0,
+        inboxCursor: 0,
+        targetCursor: 0,
+        rescueTargetIdx: 0,
+        selectedTargetId: 0xFFFF,
+
+        kbColMode: false,
+        kbRow: 0,
+        kbCol: 0,
+        kbBuffer: '',
+        kbMaxLen: 16,
+
+        lastActivityTime: performance.now(),
+        sosCountdownStart: 0,
+        ledFlashUntil: 0,
+
+        animType: 'GLITCH',
+        animStart: performance.now(),
+        animDuration: 360
+      };
+    }
+
+    let nodes = [
+      createNode(1, 'NODE01', 115, 185, true),
+      createNode(2, 'NODE02', 310, 80,  true),
+      createNode(3, 'NODE03', 320, 305, false),
+      createNode(4, 'NODE04', 535, 185, false)
+    ];
+
+    function getNode(id) {
+      return nodes.find(n => n.id === id);
+    }
+
+    function addMeshNode() {
+      if (nodes.length >= MAX_NODES) return;
+      const usedIds = new Set(nodes.map(n => n.id));
+      let nextId = 1;
+      while (usedIds.has(nextId)) nextId++;
+
+      const centerWorld = screenToWorld(meshCanvas.width / 2, meshCanvas.height / 2);
+      const angle = nextId * 1.15;
+      const nx = Math.round(centerWorld.x + Math.cos(angle) * 140);
+      const ny = Math.round(centerWorld.y + Math.sin(angle) * 110);
+
+      const newNode = createNode(nextId, `NODE0${nextId}`, nx, ny, nextId % 2 === 1);
+      nodes.push(newNode);
+      nodes.sort((a, b) => a.id - b.id);
+
+      selectNode(nextId);
+      sendSilentPacket(newNode, PKT.ROLLCALL, 0xFFFF);
+      Buzzer.confirm(newNode.buzzer);
+    }
+
+    function removeLastMeshNode() {
+      if (nodes.length <= 2) return;
+      const removed = nodes.pop();
+      nodes.forEach(n => { delete n.neighbors[removed.id]; });
+      if (selectedNodeId === removed.id) {
+        selectNode(nodes[nodes.length - 1].id);
+      } else {
+        syncAllPanels();
+      }
+    }
+
+    function addBlockerFromPreset() {
+      const key = document.getElementById('blockerPresetSelect').value;
+      const tpl = BLOCKER_PRESETS[key] || BLOCKER_PRESETS.wall;
+      const centerWorld = screenToWorld(meshCanvas.width / 2, meshCanvas.height / 2);
+      const offset = (obstacles.length % 5) * 18;
+      const newObs = {
+        uid: `BLK_${++blockerSeq}`,
+        label: tpl.label,
+        x: Math.round(centerWorld.x - tpl.w / 2 + offset),
+        y: Math.round(centerWorld.y - tpl.h / 2 + offset),
+        w: tpl.w,
+        h: tpl.h,
+        lossDb: tpl.lossDb
+      };
+      obstacles.push(newObs);
+      selectedBlockerUid = newObs.uid;
+      updateBlockerToolbarState();
+      refreshPowerAndMatrixUI();
+      updateCanvasTelemetryOverlay();
+    }
+
+    function deleteSelectedBlocker() {
+      if (!selectedBlockerUid) return;
+      obstacles = obstacles.filter(o => o.uid !== selectedBlockerUid);
+      selectedBlockerUid = null;
+      updateBlockerToolbarState();
+      refreshPowerAndMatrixUI();
+      updateCanvasTelemetryOverlay();
+    }
+
+    function clearAllBlockers() {
+      obstacles = [];
+      selectedBlockerUid = null;
+      updateBlockerToolbarState();
+      refreshPowerAndMatrixUI();
+      updateCanvasTelemetryOverlay();
+    }
+
+    function updateBlockerToolbarState() {
+      const btn = document.getElementById('btnDeleteSelectedBlocker');
+      if (selectedBlockerUid && obstacles.some(o => o.uid === selectedBlockerUid)) {
+        btn.classList.remove('hidden');
+      } else {
+        btn.classList.add('hidden');
+      }
+    }
+
+    function getNodeCoords(node) {
+      const lat = BASE_LAT - ((node.y - 200) * METERS_PER_PX) / 111111.0;
+      const lon = BASE_LON + ((node.x - 320) * METERS_PER_PX) / (111111.0 * Math.cos(BASE_LAT * Math.PI / 180));
+      return {
+        lat,
+        lon,
+        latE7: Math.round(lat * 1e7),
+        lonE7: Math.round(lon * 1e7)
+      };
+    }
+
+    function haversineMeters(lat1, lon1, lat2, lon2) {
+      const R = 6371000;
+      const dLat = (lat2 - lat1) * Math.PI / 180;
+      const dLon = (lon2 - lon1) * Math.PI / 180;
+      const a = Math.sin(dLat / 2) ** 2 +
+                Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                Math.sin(dLon / 2) ** 2;
+      return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    }
+
+    function bearingDegrees(lat1, lon1, lat2, lon2) {
+      const y = Math.sin((lon2 - lon1) * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180);
+      const x = Math.cos(lat1 * Math.PI / 180) * Math.sin(lat2 * Math.PI / 180) -
+                Math.sin(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                Math.cos((lon2 - lon1) * Math.PI / 180);
+      return ((Math.atan2(y, x) * 180 / Math.PI) + 360) % 360;
+    }
+
+    function cardinalFromDeg(deg) {
+      const dirs = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
+      return dirs[Math.round(deg / 45) & 7];
+    }
+
+    // =========================================================================
+    // 5. SPATIAL RF PROPAGATION & OBSTACLE ATTENUATION PHYSICS
+    // =========================================================================
+    function lineIntersectsRect(x1, y1, x2, y2, rx, ry, rw, rh) {
+      if ((x1 >= rx && x1 <= rx + rw && y1 >= ry && y1 <= ry + rh) ||
+          (x2 >= rx && x2 <= rx + rw && y2 >= ry && y2 <= ry + rh)) {
+        return true;
+      }
+      function ccw(ax, ay, bx, by, cx, cy) {
+        return (cy - ay) * (bx - ax) > (by - ay) * (cx - ax);
+      }
+      function segIntersect(ax, ay, bx, by, cx, cy, dx, dy) {
+        return ccw(ax, ay, cx, cy, dx, dy) !== ccw(bx, by, cx, cy, dx, dy) &&
+               ccw(ax, ay, bx, by, cx, cy) !== ccw(ax, ay, bx, by, dx, dy);
+      }
+      const edges = [
+        [rx, ry, rx + rw, ry],
+        [rx + rw, ry, rx + rw, ry + rh],
+        [rx + rw, ry + rh, rx, ry + rh],
+        [rx, ry + rh, rx, ry]
+      ];
+      return edges.some(e => segIntersect(x1, y1, x2, y2, e[0], e[1], e[2], e[3]));
+    }
+
+    function computeLinkMetrics(nA, nB) {
+      const dx = nB.x - nA.x;
+      const dy = nB.y - nA.y;
+      const distPx = Math.max(8, Math.hypot(dx, dy));
+      const distMeters = distPx * METERS_PER_PX;
+
+      let rssi = -42 - 26 * Math.log10(distMeters / 10);
+      let obstacleLoss = 0;
+      let blockersHit = 0;
+      obstacles.forEach(obs => {
+        if (lineIntersectsRect(nA.x, nA.y, nB.x, nB.y, obs.x, obs.y, obs.w, obs.h)) {
+          obstacleLoss += obs.lossDb;
+          blockersHit++;
+        }
+      });
+      rssi -= obstacleLoss;
+      rssi = Math.round(Math.max(-145, Math.min(-32, rssi)));
+
+      const useLR = nA.longRange || nB.longRange;
+      const sensitivity = useLR ? -132 : -123;
+      const snr = Number(((rssi - sensitivity) * 0.45 - 2.5).toFixed(1));
+      const viable = nA.powered && nB.powered && (rssi >= sensitivity);
+
+      return { distMeters, rssi, snr, viable, obstacleLoss, blockersHit, sensitivity };
+    }
+
+    // =========================================================================
+    // 6. FIRMWARE PACKET ENGINE (CONTROLLED FLOODING, DUPCACHE, RELAY, ACKS)
+    // =========================================================================
+    function triggerAnim(node, type, duration = 360) {
+      node.animType = type;
+      node.animStart = performance.now();
+      node.animDuration = duration;
+    }
+
+    function isDuplicate(node, srcId, msgId) {
+      return node.dupCache.some(e => e.srcId === srcId && e.msgId === msgId);
+    }
+
+    function markSeen(node, srcId, msgId) {
+      if (isDuplicate(node, srcId, msgId)) return;
+      node.dupCache.push({ srcId, msgId });
+      if (node.dupCache.length > 32) node.dupCache.shift();
+    }
+
+    function updateNeighbor(node, rx, rssi, snr, hops) {
+      if (rx.srcId === node.id || rx.srcId === 0) return;
+      const existing = node.neighbors[rx.srcId];
+      if (existing) {
+        existing.prevRssi = existing.rssi;
+        existing.rssi = rssi;
+        existing.snr = snr;
+        existing.batPct = rx.code;
+        existing.lastHops = hops;
+        existing.lastSeen = performance.now();
+        if (rx.hasGps) {
+          existing.hasGps = true;
+          existing.latE7 = rx.latE7;
+          existing.lonE7 = rx.lonE7;
+        }
+        existing.rssiHist.push(Math.max(-125, Math.min(-20, rssi)));
+        if (existing.rssiHist.length > 28) existing.rssiHist.shift();
+        if (rx.srcName) existing.name = rx.srcName;
+      } else {
+        const hist = Array(28).fill(Math.max(-125, Math.min(-20, rssi)));
+        node.neighbors[rx.srcId] = {
+          id: rx.srcId,
+          name: rx.srcName || `NODE0${rx.srcId}`,
+          rssi,
+          prevRssi: rssi,
+          snr,
+          rssiHist: hist,
+          batPct: rx.code,
+          lastHops: hops,
+          hasGps: !!rx.hasGps,
+          latE7: rx.latE7,
+          lonE7: rx.lonE7,
+          lastSeen: performance.now()
+        };
+      }
+    }
+
+    function countActiveNeighbors(node) {
+      const now = performance.now();
+      return Object.values(node.neighbors).filter(n => (now - n.lastSeen) < 720000).length;
+    }
+
+    function pushInbox(node, rx, rssi, snr, hops) {
+      node.inbox.unshift({
+        srcId: rx.srcId,
+        srcName: rx.srcName,
+        type: rx.type,
+        code: rx.code,
+        isPrivate: rx.dstId === node.id,
+        isSOS: rx.type === PKT.SOS,
+        hops,
+        hasGps: !!rx.hasGps,
+        latE7: rx.latE7,
+        lonE7: rx.lonE7,
+        text: rx.text,
+        rssi,
+        snr,
+        rxTime: performance.now()
+      });
+      if (node.inbox.length > 16) node.inbox.pop();
+      node.hasUnread = true;
+    }
+
+    function transmitPacket(txNode, pkt, isRelay = false) {
+      if (!txNode.powered) return;
+      pkt.authTag = computeAuthTag(pkt);
+      markSeen(txNode, pkt.srcId, pkt.msgId);
+      txNode.ledFlashUntil = performance.now() + 130;
+
+      if (isRelay) totalMeshRelays++;
+      else totalMeshTx++;
+
+      const rawBytes = serializePacketBytes(pkt, true);
+      const entry = {
+        uid: `${performance.now()}-${Math.random()}`,
+        timeStr: new Date().toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+        txNodeName: txNode.name,
+        isRelay,
+        pkt: { ...pkt },
+        bytes: rawBytes
+      };
+      packetHistoryLog.unshift(entry);
+      if (packetHistoryLog.length > 40) packetHistoryLog.pop();
+      if (!selectedPacketEntry) selectedPacketEntry = entry;
+      renderPacketDissector();
+      updateCanvasTelemetryOverlay();
+
+      let waveColor = '#10b981';
+      if (pkt.type === PKT.SOS) waveColor = '#ef4444';
+      else if (pkt.type === PKT.ACK) waveColor = '#f59e0b';
+      else if (pkt.type === PKT.ROLLCALL || pkt.type === PKT.PRESENT || pkt.type === PKT.RANGETEST) waveColor = '#38bdf8';
+      else if (pkt.type === PKT.HEARTBEAT) waveColor = '#64748b';
+
+      const maxPx = txNode.longRange ? 380 : 270;
+      rfWaves.push({
+        pkt: { ...pkt },
+        originNodeId: txNode.id,
+        x: txNode.x,
+        y: txNode.y,
+        radius: 10,
+        maxRadius: maxPx,
+        color: waveColor,
+        deliveredTo: new Set([txNode.id])
+      });
+    }
+
+    function sendSilentPacket(node, type, dstId = 0xFFFF) {
+      if (!node.powered) return;
+      const coords = getNodeCoords(node);
+      const pkt = {
+        type,
+        srcId: node.id,
+        srcName: node.name,
+        dstId,
+        msgId: node.msgCounter++,
+        origTtl: 1,
+        ttl: 1,
+        code: node.battery,
+        hasGps: node.gpsAttached ? 1 : 0,
+        latE7: node.gpsAttached ? coords.latE7 : 0,
+        lonE7: node.gpsAttached ? coords.lonE7 : 0,
+        text: 'SYNC',
+        authTag: 0
+      };
+      transmitPacket(node, pkt, false);
+    }
+
+    function startTrackedSend(node, type, dstId, code, text) {
+      if (!node.powered) return;
+      triggerAnim(node, 'TOSS', 360);
+      const coords = getNodeCoords(node);
+      const pkt = {
+        type,
+        srcId: node.id,
+        srcName: node.name,
+        dstId,
+        msgId: node.msgCounter++,
+        origTtl: node.ttl,
+        ttl: node.ttl,
+        code,
+        hasGps: node.gpsAttached ? 1 : 0,
+        latE7: node.gpsAttached ? coords.latE7 : 0,
+        lonE7: node.gpsAttached ? coords.lonE7 : 0,
+        text: text.substring(0, 16),
+        authTag: 0
+      };
+
+      node.lastSentPkt = pkt;
+      node.waitingAckMsgId = pkt.msgId;
+      node.txDeliveryStage = 1;
+      node.txRetriesLeft = 3;
+      node.sosPulseCount = 1;
+      node.txRetryTimer = performance.now();
+      node.screen = SCR.TX_STATUS;
+
+      transmitPacket(node, { ...pkt }, false);
+      if (node.id === selectedNodeId) refreshPortalUI();
+    }
+
+    function handleNodeReceivePacket(rxNode, rx, rssi, snr) {
+      if (!rxNode.powered) return;
+      if (rx.authTag !== computeAuthTag(rx)) return;
+
+      rxNode.ledFlashUntil = performance.now() + 100;
+      const hopsTaken = (rx.origTtl >= rx.ttl) ? (rx.origTtl - rx.ttl + 1) : 1;
+      updateNeighbor(rxNode, rx, rssi, snr, hopsTaken);
+
+      if (rx.srcId === rxNode.id && rx.msgId === rxNode.waitingAckMsgId && rxNode.txDeliveryStage === 1) {
+        rxNode.txDeliveryStage = 2;
+      }
+
+      const pktKey = `${rx.srcId}:${rx.msgId}`;
+      if (rxNode.pendingRelayKey === pktKey) {
+        rxNode.pendingRelayKey = null;
+      }
+
+      if (isDuplicate(rxNode, rx.srcId, rx.msgId)) return;
+      markSeen(rxNode, rx.srcId, rx.msgId);
+
+      if (rx.type === PKT.HEARTBEAT || rx.type === PKT.PRESENT) {
+        if (rxNode.id === selectedNodeId) refreshPortalUI();
+        return;
+      }
+
+      if (rx.type === PKT.ROLLCALL) {
+        const jitter = 60 + Math.random() * 180;
+        scheduledEvents.push({
+          dueTime: performance.now() + jitter,
+          fn: () => sendSilentPacket(rxNode, PKT.PRESENT, 0xFFFF)
+        });
+        return;
+      }
+
+      if (rx.type === PKT.ACK && rx.dstId === rxNode.id) {
+        if (rxNode.rangeTestRunning && rx.code === 0xAA) {
+          rxNode.rangeAckRecv++;
+          rxNode.rangeLastRssi = rssi;
+          rxNode.rangeLastSnr = snr;
+          if (rxNode.id === selectedNodeId) Buzzer.click(rxNode.buzzer);
+          return;
+        }
+        if (rxNode.waitingAckMsgId !== 0 && (rx.msgId === rxNode.waitingAckMsgId || (rxNode.lastSentPkt && rxNode.lastSentPkt.type === PKT.SOS))) {
+          if (rxNode.txDeliveryStage !== 3) {
+            rxNode.txDeliveryStage = 3;
+            if (rxNode.id === selectedNodeId) Buzzer.confirm(rxNode.buzzer);
+            triggerAnim(rxNode, 'SPIN', 420);
+          }
+          if (rxNode.lastSentPkt && rxNode.lastSentPkt.type !== PKT.SOS) {
+            rxNode.waitingAckMsgId = 0;
+          }
+          return;
+        }
+      }
+
+      if (rx.type === PKT.RANGETEST) {
+        const coords = getNodeCoords(rxNode);
+        const ack = {
+          type: PKT.ACK,
+          srcId: rxNode.id,
+          srcName: rxNode.name,
+          dstId: rx.srcId,
+          msgId: rx.msgId,
+          origTtl: rxNode.ttl,
+          ttl: rxNode.ttl,
+          code: 0xAA,
+          hasGps: rxNode.gpsAttached ? 1 : 0,
+          latE7: rxNode.gpsAttached ? coords.latE7 : 0,
+          lonE7: rxNode.gpsAttached ? coords.lonE7 : 0,
+          text: 'R_ACK',
+          authTag: 0
+        };
+        scheduledEvents.push({
+          dueTime: performance.now() + 70,
+          fn: () => transmitPacket(rxNode, ack, false)
+        });
+        return;
+      }
+
+      const forMe = (rx.dstId === 0xFFFF || rx.dstId === rxNode.id);
+      if (forMe && rx.type !== PKT.ACK) {
+        rxNode.lastActivityTime = performance.now();
+        pushInbox(rxNode, rx, rssi, snr, hopsTaken);
+
+        const coords = getNodeCoords(rxNode);
+        const ack = {
+          type: PKT.ACK,
+          srcId: rxNode.id,
+          srcName: rxNode.name,
+          dstId: rx.srcId,
+          msgId: rx.msgId,
+          origTtl: rxNode.ttl,
+          ttl: rxNode.ttl,
+          code: rxNode.battery,
+          hasGps: rxNode.gpsAttached ? 1 : 0,
+          latE7: rxNode.gpsAttached ? coords.latE7 : 0,
+          lonE7: rxNode.gpsAttached ? coords.lonE7 : 0,
+          text: 'ACK',
+          authTag: 0
+        };
+        scheduledEvents.push({
+          dueTime: performance.now() + 90 + Math.random() * 110,
+          fn: () => transmitPacket(rxNode, ack, false)
+        });
+
+        rxNode.activeAlertPkt = { ...rx };
+        rxNode.activeAlertRssi = rssi;
+        rxNode.activeAlertSnr = snr;
+        rxNode.activeAlertHops = hopsTaken;
+        rxNode.screen = SCR.INCOMING_ALERT;
+
+        if (rxNode.id === selectedNodeId) {
+          if (rx.type === PKT.SOS) Buzzer.sos(rxNode.buzzer);
+          else Buzzer.confirm(rxNode.buzzer);
+          refreshPortalUI();
+        }
+      }
+
+      if (rx.ttl > 0 && rx.dstId !== rxNode.id) {
+        rxNode.pendingRelayKey = pktKey;
+        const relayDelay = 90 + Math.random() * 190;
+        const fwdPkt = { ...rx, ttl: rx.ttl - 1 };
+        scheduledEvents.push({
+          dueTime: performance.now() + relayDelay,
+          fn: () => {
+            if (rxNode.pendingRelayKey === pktKey && rxNode.powered) {
+              rxNode.pendingRelayKey = null;
+              rxNode.lastRelayedFrom = fwdPkt.srcName;
+              rxNode.lastRelayedBannerTime = performance.now();
+              transmitPacket(rxNode, fwdPkt, true);
+            }
+          }
+        });
+      }
+    }
+
+    // =========================================================================
+    // 7. PIXEL-ACCURATE 128x64 SSD1306 OLED RENDERER
+    // =========================================================================
+    const oledCanvas = document.getElementById('oledCanvas');
+    const octx = oledCanvas.getContext('2d');
+
+    function oledClear(invert = false) {
+      octx.fillStyle = invert ? '#e6f4ff' : '#05070a';
+      octx.fillRect(0, 0, 128, 64);
+    }
+
+    function oledColor(white = true, invert = false) {
+      const isLit = invert ? !white : white;
+      octx.fillStyle = isLit ? '#e6f4ff' : '#05070a';
+      octx.strokeStyle = isLit ? '#e6f4ff' : '#05070a';
+    }
+
+    function oledText(str, x, y, size = 1, white = true, invert = false) {
+      oledColor(white, invert);
+      octx.font = `bold ${size === 2 ? 13 : 8}px "JetBrains Mono", monospace`;
+      octx.textBaseline = 'top';
+      octx.fillText(str, x, y);
+    }
+
+    function oledRect(x, y, w, h, fill = false, white = true, invert = false) {
+      oledColor(white, invert);
+      if (fill) octx.fillRect(x, y, w, h);
+      else octx.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1);
+    }
+
+    function oledLine(x1, y1, x2, y2, white = true, invert = false) {
+      oledColor(white, invert);
+      octx.beginPath();
+      octx.moveTo(x1 + 0.5, y1 + 0.5);
+      octx.lineTo(x2 + 0.5, y2 + 0.5);
+      octx.stroke();
+    }
+
+    function drawTopBar(node) {
+      const now = performance.now();
+      if (node.lastRelayedBannerTime > 0 && (now - node.lastRelayedBannerTime) < 2500) {
+        oledText(`>>RELAY:${node.lastRelayedFrom}`, 1, 2);
+      } else {
+        oledText(node.name.padEnd(6, ' '), 1, 2);
+        const tag = node.gpsFix ? 'G' : (node.wifiAP ? 'W' : ' ');
+        const mode = node.longRange ? 'LR' : 'NM';
+        const cnt = countActiveNeighbors(node);
+        oledText(`[${mode}|${cnt}N${tag}]`, 39, 2);
+      }
+      oledText(`${String(node.battery).padStart(3, ' ')}%`, 92, 2);
+      oledRect(118, 2, 8, 7, false);
+      const fillW = Math.round((node.battery / 100) * 6);
+      if (fillW > 0) oledRect(119, 3, fillW, 5, true);
+      oledLine(0, 12, 128, 12);
+    }
+
+    function drawMascotOverlay(node, elapsed, dur) {
+      const t = Math.min(1, elapsed / dur);
+      oledClear(false);
+      const cx = 64 + (node.animType === 'SLIDE' ? (1 - t) * -45 : 0);
+      const cy = 32 + (node.animType === 'TOSS' ? -Math.sin(t * Math.PI) * 14 : 0);
+      const scaleY = node.animType === 'TOSS' ? Math.max(0.15, Math.abs(Math.cos(t * Math.PI * 2))) : 1;
+      const w = 34, h = Math.round(34 * scaleY);
+
+      oledRect(cx - w / 2, cy - h / 2, w, h, true);
+      if (h > 8) {
+        oledRect(cx - 12, cy - 3, 9, Math.max(2, Math.round(6 * scaleY)), true, false);
+        oledRect(cx + 3,  cy - 3, 9, Math.max(2, Math.round(6 * scaleY)), true, false);
+      }
+      if (node.animType === 'GLITCH' && t < 0.7) {
+        oledRect(10, 20 + Math.sin(t * 40) * 12, 108, 3, true, false);
+      }
+      if (node.animType === 'SPIN') {
+        oledText('ACK OK', 46, 54);
+      }
+    }
+
+    function renderSelectedNodeOled() {
+      const node = getNode(selectedNodeId);
+      const offOverlay = document.getElementById('poweredOffOverlay');
+      if (!node || !node.powered) {
+        offOverlay.classList.remove('hidden');
+        return;
+      }
+      offOverlay.classList.add('hidden');
+
+      const now = performance.now();
+      const animElapsed = now - node.animStart;
+      if (animElapsed < node.animDuration) {
+        drawMascotOverlay(node, animElapsed, node.animDuration);
+        return;
+      }
+
+      if (node.screen === SCR.SLEEPING) {
+        oledClear(false);
+        oledText('LIGHT SLEEP (0.8mA)', 16, 28);
+        return;
+      }
+
+      const inv = (node.screen === SCR.INCOMING_ALERT);
+      oledClear(inv);
+
+      switch (node.screen) {
+        case SCR.HOME: {
+          drawTopBar(node);
+          oledLine(64, 13, 64, 64);
+          oledLine(0, 38, 128, 38);
+          const titles = ['MESH NET', 'MESSAGES', 'RESCUE', 'SETTINGS'];
+          const qx = [0, 65, 0, 65];
+          const qy = [14, 14, 39, 39];
+
+          for (let i = 0; i < 4; i++) {
+            const sel = (node.homeCursor === i);
+            if (sel) oledRect(qx[i] + 1, qy[i] + 1, 61, 23, true);
+            const ix = qx[i] + 4, iy = qy[i] + 6;
+            if (i === 0) {
+              oledRect(ix + 2, iy + 5, 3, 3, true, !sel);
+              oledRect(ix + 8, iy + 1, 3, 3, true, !sel);
+              oledRect(ix + 8, iy + 9, 3, 3, true, !sel);
+              oledLine(ix + 3, iy + 6, ix + 9, iy + 2, !sel);
+              oledLine(ix + 3, iy + 6, ix + 9, iy + 10, !sel);
+            } else if (i === 1) {
+              oledRect(ix, iy + 2, 11, 8, false, !sel);
+              oledLine(ix, iy + 2, ix + 5, iy + 6, !sel);
+              oledLine(ix + 10, iy + 2, ix + 5, iy + 6, !sel);
+              if (node.hasUnread) oledRect(ix + 10, iy, 3, 3, true, !sel);
+            } else if (i === 2) {
+              oledRect(ix + 2, iy + 2, 8, 8, false, !sel);
+              oledLine(ix, iy + 6, ix + 12, iy + 6, !sel);
+              oledLine(ix + 6, iy, ix + 6, iy + 12, !sel);
+            } else {
+              oledLine(ix, iy + 2, ix + 10, iy + 2, !sel);
+              oledLine(ix, iy + 6, ix + 10, iy + 6, !sel);
+              oledLine(ix, iy + 10, ix + 10, iy + 10, !sel);
+            }
+            oledText(titles[i], qx[i] + 18, qy[i] + 8, 1, !sel);
+          }
+          break;
+        }
+
+        case SCR.MESH: {
+          drawTopBar(node);
+          oledText('MESH NODES (NXT:Ping)', 1, 15);
+          const actList = Object.values(node.neighbors).filter(n => (now - n.lastSeen) < 720000);
+          if (actList.length === 0) {
+            oledText('Roll-Call sent...', 4, 32);
+          } else {
+            actList.slice(0, 3).forEach((nb, idx) => {
+              const age = Math.floor((now - nb.lastSeen) / 1000);
+              const gpsTag = nb.hasGps ? 'GPS' : '---';
+              oledText(`${nb.name.padEnd(6)}|${nb.rssi}dB|${gpsTag}|${age}s`, 1, 26 + idx * 10);
+            });
+          }
+          oledText('[NXT]:RollCall [SEL]:Bk', 1, 55);
+          break;
+        }
+
+        case SCR.MSG_MENU: {
+          drawTopBar(node);
+          const opts = ['1. Write Msg (Keybd)', '2. Quick Presets', '3. Inbox & Triage', '4. < Back Home'];
+          opts.forEach((opt, i) => {
+            const y = 16 + i * 12;
+            const sel = node.msgMenuCursor === i;
+            if (sel) oledRect(0, y - 1, 128, 10, true);
+            oledText(opt, 4, y, 1, !sel);
+          });
+          break;
+        }
+
+        case SCR.TARGET_PICK: {
+          drawTopBar(node);
+          oledText('SEND MESSAGE TO:', 1, 15);
+          const targets = getTargetPickerList(node);
+          if (node.targetCursor >= targets.length) node.targetCursor = 0;
+          const startIdx = node.targetCursor >= 4 ? node.targetCursor - 3 : 0;
+
+          for (let row = 0; row < 4 && (startIdx + row) < targets.length; row++) {
+            const idx = startIdx + row;
+            const y = 26 + row * 9;
+            const sel = node.targetCursor === idx;
+            if (sel) oledRect(0, y - 1, 128, 9, true);
+            oledText(targets[idx].label, 4, y, 1, !sel);
+          }
+          break;
+        }
+
+        case SCR.KEYBOARD: {
+          const prefix = node.kbPurpose === 'ID' ? 'ID>' : (node.selectedTargetId === 0xFFFF ? 'ALL>' : `N0${node.selectedTargetId}>`);
+          oledText(`${prefix}${node.kbBuffer}_`, 1, 2);
+          oledText(`${node.kbBuffer.length}/${node.kbMaxLen}`, 102, 2);
+          oledLine(0, 13, 128, 13);
+
+          for (let r = 0; r < 4; r++) {
+            if (!node.kbColMode && node.kbRow === r) {
+              oledRect(0, 15 + r * 12, 126, 12, false);
+            }
+            for (let c = 0; c < 7; c++) {
+              const cx = c * 18, cy = 15 + r * 12;
+              const cellSel = node.kbColMode && node.kbRow === r && node.kbCol === c;
+              if (cellSel) oledRect(cx + 1, cy + 1, 16, 10, true);
+              const ch = KB_MAP[r][c];
+              const disp = ch === ' ' ? 'SP' : (ch === '\n' ? 'OK' : ch);
+              oledText(disp, cx + (disp.length > 1 ? 3 : 6), cy + 2, 1, !cellSel);
+            }
+          }
+          break;
+        }
+
+        case SCR.PRESETS: {
+          drawTopBar(node);
+          const startIdx = Math.floor(node.presetCursor / 4) * 4;
+          for (let i = 0; i < 4 && (startIdx + i) < PRESET_LABELS.length; i++) {
+            const idx = startIdx + i;
+            const y = 16 + i * 12;
+            const sel = node.presetCursor === idx;
+            if (sel) oledRect(0, y - 1, 128, 10, true);
+            oledText(PRESET_LABELS[idx], 4, y, 1, !sel);
+          }
+          break;
+        }
+
+        case SCR.INBOX: {
+          drawTopBar(node);
+          if (node.inbox.length === 0) {
+            oledText('Inbox Empty', 26, 32);
+          } else {
+            const it = node.inbox[node.inboxCursor];
+            oledText(`${node.inboxCursor + 1}/${node.inbox.length} ${it.srcName} ${it.rssi}dB ${it.hops}H`, 1, 15);
+            if (it.hasGps) {
+              oledText(`${(it.latE7 / 1e7).toFixed(4)},${(it.lonE7 / 1e7).toFixed(4)}`, 1, 25);
+            } else {
+              oledText(`TYPE: ${it.isSOS ? 'SOS!' : (it.isPrivate ? 'PRIV' : 'ALL')} (No GPS)`, 1, 25);
+            }
+            oledRect(0, 35, 128, 18, false);
+            oledText(it.text, 4, 40);
+          }
+          oledText('[NXT]:Next [SEL]:Back', 1, 55);
+          break;
+        }
+
+        case SCR.RESCUE: {
+          drawTopBar(node);
+          const actList = Object.values(node.neighbors);
+          if (actList.length === 0) {
+            oledText('Scanning for beacon...', 4, 28);
+          } else {
+            if (node.rescueTargetIdx >= actList.length) node.rescueTargetIdx = 0;
+            const target = actList[node.rescueTargetIdx];
+            const diff = target.rssi - target.prevRssi;
+
+            if (node.gpsFix && target.hasGps) {
+              const myC = getNodeCoords(node);
+              const tLat = target.latE7 / 1e7;
+              const tLon = target.lonE7 / 1e7;
+              const distM = haversineMeters(myC.lat, myC.lon, tLat, tLon);
+              const brg = bearingDegrees(myC.lat, myC.lon, tLat, tLon);
+
+              oledText(`GPS TRK: ${target.name}`, 1, 15);
+              const distStr = distM >= 1000 ? `${(distM / 1000).toFixed(2)}km` : `${Math.round(distM)}m`;
+              oledText(`${distStr} ${cardinalFromDeg(brg)}`, 1, 27, 2);
+              oledText(`BRG:${Math.round(brg)} deg | ${target.rssi}dBm`, 1, 46);
+              oledText('[NXT]:Target [SEL]:Bk', 1, 55);
+            } else {
+              const estMeters = Math.pow(10, (-42 - target.rssi) / 26) * 10;
+              oledText(`TRK:${target.name} ~${Math.round(estMeters)}m ${diff >= 0 ? '^HOT' : 'vCLD'}`, 1, 15);
+              if (target.hasGps) {
+                oledText(`${(target.latE7 / 1e7).toFixed(4)},${(target.lonE7 / 1e7).toFixed(4)}`, 1, 25);
+              } else {
+                oledText(`RSSI:${target.rssi}dB SNR:${target.snr}dB`, 1, 25);
+              }
+              oledRect(0, 35, 128, 28, false);
+              for (let g = 0; g < target.rssiHist.length - 1; g++) {
+                const v1 = Math.max(-120, Math.min(-35, target.rssiHist[g]));
+                const v2 = Math.max(-120, Math.min(-35, target.rssiHist[g + 1]));
+                const y1 = 61 - Math.round(((v1 + 120) / 85) * 24);
+                const y2 = 61 - Math.round(((v2 + 120) / 85) * 24);
+                oledLine(2 + g * 4, y1, 2 + (g + 1) * 4, y2);
+              }
+            }
+          }
+          break;
+        }
+
+        case SCR.SETTINGS: {
+          drawTopBar(node);
+          const startIdx = node.settingsCursor >= 4 ? node.settingsCursor - 3 : 0;
+          const slpLabels = ['15s', '30s', '60s', 'Never'];
+          for (let row = 0; row < 4; row++) {
+            const i = startIdx + row;
+            const y = 16 + row * 12;
+            const sel = node.settingsCursor === i;
+            if (sel) oledRect(0, y - 1, 128, 10, true);
+
+            let line = '';
+            if (i === 0) line = `1. Sleep : ${slpLabels[node.sleepIdx]}`;
+            else if (i === 1) line = `2. TTL   : ${node.ttl} Hops`;
+            else if (i === 2) line = `3. Range : ${node.longRange ? 'Long(SF10)' : 'Norm(SF7)'}`;
+            else if (i === 3) line = `4. Buzzer: ${node.buzzer ? 'ON' : 'OFF'}`;
+            else if (i === 4) line = `5. NodeID: ${node.name}`;
+            else if (i === 5) line = `6. WiFiAP: ${node.wifiAP ? 'ON(192.168.4.1)' : 'OFF'}`;
+            else if (i === 6) line = '7. Run Range Test >';
+            else if (i === 7) {
+              if (!node.gpsAttached) line = '8. GPS: Not Wired';
+              else line = `8. GPS: FIX (${node.sats} Sat)`;
+            }
+            oledText(line, 4, y, 1, !sel);
+          }
+          break;
+        }
+
+        case SCR.RANGETEST: {
+          drawTopBar(node);
+          oledText('JUDGE RANGE TEST LOG', 1, 15);
+          const pdr = node.rangePingSent > 0 ? Math.round((node.rangeAckRecv * 100) / node.rangePingSent) : 0;
+          oledText(`SENT: ${node.rangePingSent} | ACK: ${node.rangeAckRecv}`, 1, 27);
+          oledText(`DELIVERY RATE: ${pdr}%`, 1, 37);
+          oledText(`LAST: ${node.rangeLastRssi}dBm | ${node.rangeLastSnr}dB`, 1, 47);
+          oledText('[NXT]:Reset [SEL]:Exit', 1, 55);
+          break;
+        }
+
+        case SCR.SOS_COUNTDOWN: {
+          const rem = Math.max(0, 5 - Math.floor((now - node.sosCountdownStart) / 1000));
+          oledRect(0, 0, 128, 64, false);
+          oledText('SOS ALERT', 18, 8, 2);
+          oledText(String(rem), 58, 28, 2);
+          oledText('[RED/SEL]: CANCEL!', 12, 50);
+          break;
+        }
+
+        case SCR.TX_STATUS: {
+          drawTopBar(node);
+          if (node.lastSentPkt && node.lastSentPkt.type === PKT.SOS) {
+            oledText(`!! SOS PULSE #${node.sosPulseCount} !!`, 1, 16);
+          } else if (node.lastSentPkt) {
+            oledText(`TO:${node.lastSentPkt.dstId === 0xFFFF ? 'ALL' : 'PRIV'} MSG:#${node.lastSentPkt.msgId}`, 1, 16);
+          }
+
+          oledRect(4, 28, 32, 11, true);
+          oledText('SENT', 8, 30, 1, false);
+
+          oledLine(36, 33, 48, 33);
+          const rlyLit = node.txDeliveryStage >= 2 && node.txDeliveryStage !== 4;
+          oledRect(48, 28, 34, 11, rlyLit);
+          oledText('RELAY', 50, 30, 1, !rlyLit);
+
+          oledLine(82, 33, 94, 33);
+          const ackLit = node.txDeliveryStage === 3;
+          oledRect(94, 28, 30, 11, ackLit);
+          oledText('ACK', 100, 30, 1, !ackLit);
+
+          let statusLine = 'Idle';
+          if (node.txDeliveryStage === 1) statusLine = `Waiting ACK (Retry:${node.txRetriesLeft})`;
+          else if (node.txDeliveryStage === 2) statusLine = 'Heard Neighbor Relay!';
+          else if (node.txDeliveryStage === 3) statusLine = 'Confirmed Delivered!';
+          else if (node.txDeliveryStage === 4) statusLine = 'FAILED: No Route/ACK';
+
+          oledText(statusLine, 1, 43);
+          oledText('[RED/SEL]: Stop/Home', 1, 54);
+          break;
+        }
+
+        case SCR.INCOMING_ALERT: {
+          const ap = node.activeAlertPkt;
+          if (!ap) break;
+          oledText(ap.type === PKT.SOS ? '! SOS !' : 'NEW MSG', 4, 2, 2, true, true);
+          oledText(`FM:${ap.srcName} | ${node.activeAlertHops}Hop`, 4, 21, 1, true, true);
+          if (ap.hasGps) {
+            oledText(`${(ap.latE7 / 1e7).toFixed(4)},${(ap.lonE7 / 1e7).toFixed(4)}`, 4, 31, 1, true, true);
+          } else {
+            oledText(`SIG:${node.activeAlertRssi}dBm SNR:${node.activeAlertSnr}dB`, 4, 31, 1, true, true);
+          }
+          oledRect(2, 40, 124, 13, false, true, true);
+          oledText(ap.text, 6, 43, 1, true, true);
+          oledText('[RED/SEL]: Dismiss', 4, 55, 1, true, true);
+          break;
+        }
+      }
+    }
+
+    // =========================================================================
+    // 8. 3-BUTTON INPUT ENGINE + KEYBOARD SHORTCUTS
+    // =========================================================================
+    function getTargetPickerList(node) {
+      const targets = [{ id: 0xFFFF, label: 'ALL NODES (Broadcast)' }];
+      nodes.forEach(peer => {
+        if (peer.id !== node.id) {
+          const nb = node.neighbors[peer.id];
+          targets.push({
+            id: peer.id,
+            label: nb ? `PRIV -> ${nb.name} (#${peer.id})` : `PRIV -> ${peer.name}`
+          });
+        }
+      });
+      return targets;
+    }
+
+    function handleNodeButtonEvent(node, evt) {
+      if (!node || !node.powered) return;
+      node.lastActivityTime = performance.now();
+
+      if (node.screen === SCR.SLEEPING) {
+        node.screen = SCR.HOME;
+        triggerAnim(node, 'GLITCH', 360);
+        syncLeftHardwarePanel();
+        return;
+      }
+
+      if (evt === 'SOS_TRIPLE') {
+        node.rangeTestRunning = false;
+        node.sosCountdownStart = performance.now();
+        node.screen = SCR.SOS_COUNTDOWN;
+        Buzzer.sos(node.buzzer);
+        return;
+      }
+
+      switch (node.screen) {
+        case SCR.HOME:
+          if (evt === 'NEXT') {
+            node.homeCursor = (node.homeCursor + 1) % 4;
+          } else if (evt === 'SEL_SHORT') {
+            triggerAnim(node, 'SLIDE', 240);
+            if (node.homeCursor === 0) {
+              sendSilentPacket(node, PKT.ROLLCALL, 0xFFFF);
+              node.screen = SCR.MESH;
+            } else if (node.homeCursor === 1) {
+              node.msgMenuCursor = 0;
+              node.screen = SCR.MSG_MENU;
+            } else if (node.homeCursor === 2) {
+              sendSilentPacket(node, PKT.ROLLCALL, 0xFFFF);
+              node.screen = SCR.RESCUE;
+            } else if (node.homeCursor === 3) {
+              node.settingsCursor = 0;
+              node.screen = SCR.SETTINGS;
+            }
+          }
+          break;
+
+        case SCR.MESH:
+          if (evt === 'NEXT') {
+            sendSilentPacket(node, PKT.ROLLCALL, 0xFFFF);
+            Buzzer.confirm(node.buzzer);
+          } else if (evt === 'SEL_SHORT' || evt === 'SEL_LONG' || evt === 'SOS_SINGLE') {
+            node.screen = SCR.HOME;
+          }
+          break;
+
+        case SCR.RESCUE:
+          if (evt === 'NEXT') {
+            node.rescueTargetIdx++;
+            sendSilentPacket(node, PKT.ROLLCALL, 0xFFFF);
+          } else if (evt === 'SEL_SHORT' || evt === 'SEL_LONG' || evt === 'SOS_SINGLE') {
+            node.screen = SCR.HOME;
+          }
+          break;
+
+        case SCR.RANGETEST:
+          if (evt === 'NEXT') {
+            node.rangePingSent = 0;
+            node.rangeAckRecv = 0;
+            Buzzer.confirm(node.buzzer);
+          } else if (evt === 'SEL_SHORT' || evt === 'SEL_LONG' || evt === 'SOS_SINGLE') {
+            node.rangeTestRunning = false;
+            node.screen = SCR.SETTINGS;
+          }
+          break;
+
+        case SCR.MSG_MENU:
+          if (evt === 'NEXT') node.msgMenuCursor = (node.msgMenuCursor + 1) % 4;
+          else if (evt === 'SEL_LONG' || evt === 'SOS_SINGLE') node.screen = SCR.HOME;
+          else if (evt === 'SEL_SHORT') {
+            if (node.msgMenuCursor === 0) { node.targetCursor = 0; node.screen = SCR.TARGET_PICK; }
+            else if (node.msgMenuCursor === 1) { node.presetCursor = 0; node.screen = SCR.PRESETS; }
+            else if (node.msgMenuCursor === 2) { node.inboxCursor = 0; node.hasUnread = false; node.screen = SCR.INBOX; }
+            else node.screen = SCR.HOME;
+          }
+          break;
+
+        case SCR.TARGET_PICK: {
+          const targets = getTargetPickerList(node);
+          if (evt === 'NEXT') node.targetCursor = (node.targetCursor + 1) % targets.length;
+          else if (evt === 'SEL_LONG' || evt === 'SOS_SINGLE') node.screen = SCR.MSG_MENU;
+          else if (evt === 'SEL_SHORT') {
+            node.selectedTargetId = targets[node.targetCursor]?.id ?? 0xFFFF;
+            node.kbPurpose = 'MSG';
+            node.kbMaxLen = 16;
+            node.kbBuffer = '';
+            node.kbRow = 0; node.kbCol = 0; node.kbColMode = false;
+            node.screen = SCR.KEYBOARD;
+          }
+          break;
+        }
+
+        case SCR.KEYBOARD:
+          if (evt === 'SOS_SINGLE') {
+            if (node.kbBuffer.length > 0) {
+              node.kbBuffer = node.kbBuffer.slice(0, -1);
+            } else {
+              node.screen = node.kbPurpose === 'ID' ? SCR.SETTINGS : SCR.MSG_MENU;
+            }
+          } else if (evt === 'SEL_LONG') {
+            if (node.kbBuffer.length > 0) {
+              if (node.kbPurpose === 'ID') {
+                node.name = node.kbBuffer.padEnd(6, ' ').trim();
+                sendSilentPacket(node, PKT.HEARTBEAT, 0xFFFF);
+                node.screen = SCR.SETTINGS;
+                syncAllPanels();
+              } else {
+                startTrackedSend(node, PKT.TEXT, node.selectedTargetId, 0, node.kbBuffer);
+              }
+              node.kbBuffer = '';
+            } else {
+              node.screen = node.kbPurpose === 'ID' ? SCR.SETTINGS : SCR.MSG_MENU;
+            }
+          } else if (evt === 'NEXT') {
+            if (!node.kbColMode) node.kbRow = (node.kbRow + 1) % 4;
+            else node.kbCol = (node.kbCol + 1) % 7;
+          } else if (evt === 'SEL_SHORT') {
+            if (!node.kbColMode) {
+              node.kbColMode = true;
+              node.kbCol = 0;
+            } else {
+              const ch = KB_MAP[node.kbRow][node.kbCol];
+              if (ch === '\n') {
+                if (node.kbBuffer.length > 0) {
+                  if (node.kbPurpose === 'ID') {
+                    node.name = node.kbBuffer;
+                    sendSilentPacket(node, PKT.HEARTBEAT, 0xFFFF);
+                    node.screen = SCR.SETTINGS;
+                    syncAllPanels();
+                  } else {
+                    startTrackedSend(node, PKT.TEXT, node.selectedTargetId, 0, node.kbBuffer);
+                  }
+                  node.kbBuffer = '';
+                } else {
+                  node.screen = node.kbPurpose === 'ID' ? SCR.SETTINGS : SCR.MSG_MENU;
+                }
+              } else if (node.kbBuffer.length < node.kbMaxLen) {
+                node.kbBuffer += ch;
+              }
+              node.kbColMode = false;
+            }
+          }
+          break;
+
+        case SCR.PRESETS:
+          if (evt === 'NEXT') node.presetCursor = (node.presetCursor + 1) % PRESET_LABELS.length;
+          else if (evt === 'SEL_LONG' || evt === 'SOS_SINGLE') node.screen = SCR.MSG_MENU;
+          else if (evt === 'SEL_SHORT') {
+            startTrackedSend(node, PKT.PRESET, 0xFFFF, node.presetCursor, PRESET_LABELS[node.presetCursor]);
+          }
+          break;
+
+        case SCR.INBOX:
+          if (evt === 'NEXT' && node.inbox.length > 0) node.inboxCursor = (node.inboxCursor + 1) % node.inbox.length;
+          else if (evt === 'SEL_SHORT' || evt === 'SEL_LONG' || evt === 'SOS_SINGLE') node.screen = SCR.MSG_MENU;
+          break;
+
+        case SCR.SETTINGS:
+          if (evt === 'NEXT') node.settingsCursor = (node.settingsCursor + 1) % 8;
+          else if (evt === 'SEL_LONG' || evt === 'SOS_SINGLE') node.screen = SCR.HOME;
+          else if (evt === 'SEL_SHORT') {
+            if (node.settingsCursor === 0) node.sleepIdx = (node.sleepIdx + 1) % 4;
+            else if (node.settingsCursor === 1) node.ttl = (node.ttl % 5) + 1;
+            else if (node.settingsCursor === 2) {
+              node.longRange = !node.longRange;
+              syncAllPanels();
+            } else if (node.settingsCursor === 3) {
+              node.buzzer = !node.buzzer;
+            } else if (node.settingsCursor === 4) {
+              node.kbPurpose = 'ID';
+              node.kbMaxLen = 6;
+              node.kbBuffer = node.name;
+              node.kbRow = 0; node.kbCol = 0; node.kbColMode = false;
+              node.screen = SCR.KEYBOARD;
+            } else if (node.settingsCursor === 5) {
+              node.wifiAP = !node.wifiAP;
+              syncAllPanels();
+            } else if (node.settingsCursor === 6) {
+              node.rangePingSent = 0;
+              node.rangeAckRecv = 0;
+              node.rangeTestRunning = true;
+              node.lastRangePingTime = 0;
+              node.screen = SCR.RANGETEST;
+            }
+          }
+          break;
+
+        case SCR.SOS_COUNTDOWN:
+          if (evt === 'SOS_SINGLE' || evt === 'SEL_SHORT') {
+            Buzzer.error(node.buzzer);
+            node.screen = SCR.HOME;
+          }
+          break;
+
+        case SCR.TX_STATUS:
+        case SCR.INCOMING_ALERT:
+          if (evt === 'SEL_SHORT' || evt === 'SOS_SINGLE' || evt === 'SEL_LONG') {
+            node.waitingAckMsgId = 0;
+            node.screen = SCR.HOME;
+          }
+          break;
+      }
+    }
+
+    (function setupHardwareButtons() {
+      const btnSos = document.getElementById('physBtnSos');
+      const btnSel = document.getElementById('physBtnSel');
+      const btnNxt = document.getElementById('physBtnNext');
+      const selHoldBar = document.getElementById('selHoldBar');
+
+      let sosClicks = 0, firstSosTime = 0, sosSingleTimer = null;
+      btnSos.addEventListener('click', () => {
+        const node = getNode(selectedNodeId);
+        if (!node || !node.powered) return;
+        const now = performance.now();
+        if (sosClicks === 0) firstSosTime = now;
+        sosClicks++;
+        clearTimeout(sosSingleTimer);
+
+        if (sosClicks >= 3 && (now - firstSosTime) <= 1200) {
+          sosClicks = 0;
+          handleNodeButtonEvent(node, 'SOS_TRIPLE');
+        } else {
+          sosSingleTimer = setTimeout(() => {
+            if (sosClicks === 1) {
+              Buzzer.click(node.buzzer);
+              handleNodeButtonEvent(node, 'SOS_SINGLE');
+            }
+            sosClicks = 0;
+          }, 340);
+        }
+      });
+
+      let selDownTime = 0, selLongDone = false, selTimer = null, selAnimFrame = null;
+      const updateHoldProgress = () => {
+        if (!selDownTime || selLongDone) {
+          selHoldBar.style.width = '0%';
+          return;
+        }
+        const pct = Math.min(100, ((performance.now() - selDownTime) / 750) * 100);
+        selHoldBar.style.width = `${pct}%`;
+        if (pct < 100) selAnimFrame = requestAnimationFrame(updateHoldProgress);
+      };
+
+      const onSelDown = (e) => {
+        e.preventDefault();
+        const node = getNode(selectedNodeId);
+        if (!node || !node.powered) return;
+        selDownTime = performance.now();
+        selLongDone = false;
+        selAnimFrame = requestAnimationFrame(updateHoldProgress);
+        selTimer = setTimeout(() => {
+          selLongDone = true;
+          selHoldBar.style.width = '0%';
+          Buzzer.confirm(node.buzzer);
+          handleNodeButtonEvent(node, 'SEL_LONG');
+        }, 750);
+      };
+      const onSelUp = (e) => {
+        e.preventDefault();
+        clearTimeout(selTimer);
+        cancelAnimationFrame(selAnimFrame);
+        selHoldBar.style.width = '0%';
+        const node = getNode(selectedNodeId);
+        if (!node || !node.powered) return;
+        if (!selLongDone && selDownTime > 0) {
+          Buzzer.click(node.buzzer);
+          handleNodeButtonEvent(node, 'SEL_SHORT');
+        }
+        selDownTime = 0;
+      };
+      btnSel.addEventListener('mousedown', onSelDown);
+      btnSel.addEventListener('mouseup', onSelUp);
+      btnSel.addEventListener('mouseleave', () => {
+        clearTimeout(selTimer);
+        cancelAnimationFrame(selAnimFrame);
+        selHoldBar.style.width = '0%';
+        selDownTime = 0;
+      });
+      btnSel.addEventListener('touchstart', onSelDown);
+      btnSel.addEventListener('touchend', onSelUp);
+
+      let nxtHoldTimer = null, nxtRepeat = null;
+      const onNxtDown = (e) => {
+        e.preventDefault();
+        const node = getNode(selectedNodeId);
+        if (!node || !node.powered) return;
+        Buzzer.click(node.buzzer);
+        handleNodeButtonEvent(node, 'NEXT');
+        nxtHoldTimer = setTimeout(() => {
+          nxtRepeat = setInterval(() => {
+            const n = getNode(selectedNodeId);
+            if (n && n.screen === SCR.KEYBOARD) {
+              Buzzer.click(n.buzzer);
+              handleNodeButtonEvent(n, 'NEXT');
+            }
+          }, 140);
+        }, 450);
+      };
+      const onNxtUp = (e) => {
+        e.preventDefault();
+        clearTimeout(nxtHoldTimer);
+        clearInterval(nxtRepeat);
+      };
+      btnNxt.addEventListener('mousedown', onNxtDown);
+      btnNxt.addEventListener('mouseup', onNxtUp);
+      btnNxt.addEventListener('mouseleave', onNxtUp);
+      btnNxt.addEventListener('touchstart', onNxtDown);
+      btnNxt.addEventListener('touchend', onNxtUp);
+    })();
+
+    // Global Keyboard Shortcuts (ignored while typing into text inputs)
+    window.addEventListener('keydown', (e) => {
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
+
+      const guideOpen = !document.getElementById('guideModal').classList.contains('hidden');
+      if (guideOpen) {
+        if (e.key === 'Escape') closeGuideModal();
+        return;
+      }
+
+      const node = getNode(selectedNodeId);
+      if (e.key >= '1' && e.key <= '8') {
+        const targetId = Number(e.key);
+        if (getNode(targetId)) selectNode(targetId);
+        return;
+      }
+      if (e.key === 'Delete') {
+        deleteSelectedBlocker();
+        return;
+      }
+
+      if (!node || !node.powered) return;
+      if (e.key === 'n' || e.key === 'N' || e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+        e.preventDefault();
+        Buzzer.click(node.buzzer);
+        handleNodeButtonEvent(node, 'NEXT');
+      } else if (e.key === 'Enter') {
+        e.preventDefault();
+        if (e.shiftKey) {
+          Buzzer.confirm(node.buzzer);
+          handleNodeButtonEvent(node, 'SEL_LONG');
+        } else {
+          Buzzer.click(node.buzzer);
+          handleNodeButtonEvent(node, 'SEL_SHORT');
+        }
+      } else if (e.key === 'Escape' || e.key === 'Backspace') {
+        e.preventDefault();
+        Buzzer.click(node.buzzer);
+        handleNodeButtonEvent(node, 'SOS_SINGLE');
+      } else if (e.key === 'x' || e.key === 'X') {
+        e.preventDefault();
+        handleNodeButtonEvent(node, 'SOS_TRIPLE');
+      }
+    });
+
+    function triggerTripleSosDirect() {
+      const node = getNode(selectedNodeId);
+      if (node && node.powered) handleNodeButtonEvent(node, 'SOS_TRIPLE');
+    }
+
+    // =========================================================================
+    // 9. INFINITE PAN & ZOOM SPATIAL RF TERRAIN CANVAS
+    // =========================================================================
+    const meshCanvas = document.getElementById('meshCanvas');
+    const mctx = meshCanvas.getContext('2d');
+    let dragTarget = null;
+
+    function screenToWorld(sx, sy) {
+      return {
+        x: (sx - cam.x) / cam.zoom,
+        y: (sy - cam.y) / cam.zoom
+      };
+    }
+
+    function updateScaleRuler() {
+      const zoomPct = Math.round(cam.zoom * 100);
+      document.getElementById('zoomLevelReadout').textContent = `${zoomPct}%`;
+
+      // Choose a clean real-world distance step (50m, 100m, 200m, 500m)
+      const targetScreenPx = 56;
+      const rawMeters = (targetScreenPx / cam.zoom) * METERS_PER_PX;
+      const steps = [25, 50, 100, 200, 500, 1000];
+      let chosenMeters = 100;
+      for (const s of steps) {
+        if (Math.abs(s - rawMeters) < Math.abs(chosenMeters - rawMeters)) chosenMeters = s;
+      }
+      const barPx = Math.round((chosenMeters / METERS_PER_PX) * cam.zoom);
+      document.getElementById('scaleBarLabel').textContent = chosenMeters >= 1000 ? `${chosenMeters / 1000}km` : `${chosenMeters}m`;
+      document.getElementById('scaleBarLine').style.width = `${Math.max(24, Math.min(110, barPx))}px`;
+    }
+
+    function zoomMapBy(factor, anchorScreenX = null, anchorScreenY = null) {
+      const sx = anchorScreenX !== null ? anchorScreenX : meshCanvas.width / 2;
+      const sy = anchorScreenY !== null ? anchorScreenY : meshCanvas.height / 2;
+      const before = screenToWorld(sx, sy);
+      cam.zoom = Math.max(0.35, Math.min(2.8, cam.zoom * factor));
+      cam.x = sx - before.x * cam.zoom;
+      cam.y = sy - before.y * cam.zoom;
+      updateScaleRuler();
+    }
+
+    function fitMapToNodes() {
+      if (nodes.length === 0) return;
+      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+      nodes.forEach(n => {
+        minX = Math.min(minX, n.x - 60);
+        minY = Math.min(minY, n.y - 60);
+        maxX = Math.max(maxX, n.x + 60);
+        maxY = Math.max(maxY, n.y + 60);
+      });
+      const bw = Math.max(180, maxX - minX);
+      const bh = Math.max(180, maxY - minY);
+      const scaleX = (meshCanvas.width * 0.82) / bw;
+      const scaleY = (meshCanvas.height * 0.82) / bh;
+      cam.zoom = Math.max(0.45, Math.min(1.45, Math.min(scaleX, scaleY)));
+      const cx = (minX + maxX) / 2;
+      const cy = (minY + maxY) / 2;
+      cam.x = meshCanvas.width / 2 - cx * cam.zoom;
+      cam.y = meshCanvas.height / 2 - cy * cam.zoom;
+      updateScaleRuler();
+    }
+
+    function resizeMeshCanvas() {
+      const rect = meshCanvas.parentElement.getBoundingClientRect();
+      meshCanvas.width = Math.max(300, Math.floor(rect.width));
+      meshCanvas.height = Math.max(300, Math.floor(rect.height));
+      updateScaleRuler();
+    }
+    window.addEventListener('resize', resizeMeshCanvas);
+
+    function getCanvasScreenPos(e) {
+      const rect = meshCanvas.getBoundingClientRect();
+      const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+      const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+      return {
+        sx: (clientX - rect.left) * (meshCanvas.width / rect.width),
+        sy: (clientY - rect.top) * (meshCanvas.height / rect.height)
+      };
+    }
+
+    meshCanvas.addEventListener('wheel', (e) => {
+      e.preventDefault();
+      const { sx, sy } = getCanvasScreenPos(e);
+      const factor = e.deltaY < 0 ? 1.12 : (1 / 1.12);
+      zoomMapBy(factor, sx, sy);
+    }, { passive: false });
+
+    meshCanvas.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+      const { sx, sy } = getCanvasScreenPos(e);
+      const pos = screenToWorld(sx, sy);
+      for (let i = obstacles.length - 1; i >= 0; i--) {
+        const o = obstacles[i];
+        if (pos.x >= o.x && pos.x <= o.x + o.w && pos.y >= o.y && pos.y <= o.y + o.h) {
+          obstacles.splice(i, 1);
+          if (selectedBlockerUid === o.uid) selectedBlockerUid = null;
+          updateBlockerToolbarState();
+          refreshPowerAndMatrixUI();
+          updateCanvasTelemetryOverlay();
+          return;
+        }
+      }
+    });
+
+    meshCanvas.addEventListener('mousedown', onMapDown);
+    meshCanvas.addEventListener('touchstart', onMapDown, { passive: false });
+    window.addEventListener('mousemove', onMapMove);
+    window.addEventListener('touchmove', onMapMove, { passive: false });
+    window.addEventListener('mouseup', () => { dragTarget = null; });
+    window.addEventListener('touchend', () => { dragTarget = null; });
+
+    function onMapDown(e) {
+      const { sx, sy } = getCanvasScreenPos(e);
+      const pos = screenToWorld(sx, sy);
+
+      // Middle-click always pans the map
+      if (e.button === 1) {
+        dragTarget = { type: 'pan', startSx: sx, startSy: sy, origCamX: cam.x, origCamY: cam.y };
+        e.preventDefault();
+        return;
+      }
+
+      // 1. Check Node Hit (in world coordinates)
+      const nodeHitR = Math.max(16, 20 / cam.zoom);
+      for (let i = nodes.length - 1; i >= 0; i--) {
+        const n = nodes[i];
+        if (Math.hypot(pos.x - n.x, pos.y - n.y) <= nodeHitR) {
+          selectNode(n.id);
+          dragTarget = { type: 'node', ref: n, offX: pos.x - n.x, offY: pos.y - n.y };
+          e.preventDefault();
+          return;
+        }
+      }
+
+      // 2. Check Blocker Bottom-Right Resize Grip
+      const gripSize = Math.max(10, 14 / cam.zoom);
+      for (let i = obstacles.length - 1; i >= 0; i--) {
+        const o = obstacles[i];
+        if (pos.x >= o.x + o.w - gripSize && pos.x <= o.x + o.w + 4 &&
+            pos.y >= o.y + o.h - gripSize && pos.y <= o.y + o.h + 4) {
+          selectedBlockerUid = o.uid;
+          updateBlockerToolbarState();
+          dragTarget = { type: 'obs_resize', ref: o };
+          e.preventDefault();
+          return;
+        }
+      }
+
+      // 3. Check Blocker Body Drag
+      for (let i = obstacles.length - 1; i >= 0; i--) {
+        const o = obstacles[i];
+        if (pos.x >= o.x && pos.x <= o.x + o.w && pos.y >= o.y && pos.y <= o.y + o.h) {
+          selectedBlockerUid = o.uid;
+          updateBlockerToolbarState();
+          dragTarget = { type: 'obs', ref: o, offX: pos.x - o.x, offY: pos.y - o.y };
+          e.preventDefault();
+          return;
+        }
+      }
+
+      // 4. Empty Canvas Drag -> Infinite Map Pan!
+      selectedBlockerUid = null;
+      updateBlockerToolbarState();
+      dragTarget = { type: 'pan', startSx: sx, startSy: sy, origCamX: cam.x, origCamY: cam.y };
+      e.preventDefault();
+    }
+
+    function onMapMove(e) {
+      if (!dragTarget) return;
+      e.preventDefault();
+      const { sx, sy } = getCanvasScreenPos(e);
+      if (dragTarget.type === 'pan') {
+        cam.x = dragTarget.origCamX + (sx - dragTarget.startSx);
+        cam.y = dragTarget.origCamY + (sy - dragTarget.startSy);
+        return;
+      }
+
+      const pos = screenToWorld(sx, sy);
+      if (dragTarget.type === 'node') {
+        dragTarget.ref.x = Math.round(pos.x - dragTarget.offX);
+        dragTarget.ref.y = Math.round(pos.y - dragTarget.offY);
+      } else if (dragTarget.type === 'obs') {
+        dragTarget.ref.x = Math.round(pos.x - dragTarget.offX);
+        dragTarget.ref.y = Math.round(pos.y - dragTarget.offY);
+      } else if (dragTarget.type === 'obs_resize') {
+        dragTarget.ref.w = Math.max(20, Math.round(pos.x - dragTarget.ref.x));
+        dragTarget.ref.h = Math.max(20, Math.round(pos.y - dragTarget.ref.y));
+      }
+      refreshPowerAndMatrixUI();
+      updateCanvasTelemetryOverlay();
+    }
+
+    function drawMeshCanvas() {
+      const W = meshCanvas.width;
+      const H = meshCanvas.height;
+      mctx.clearRect(0, 0, W, H);
+
+      mctx.save();
+      mctx.translate(cam.x, cam.y);
+      mctx.scale(cam.zoom, cam.zoom);
+
+      // Infinite World Engineering Grid (40 world px = 100m)
+      const topLeft = screenToWorld(0, 0);
+      const botRight = screenToWorld(W, H);
+      const gridStep = 40;
+      const startX = Math.floor(topLeft.x / gridStep) * gridStep;
+      const startY = Math.floor(topLeft.y / gridStep) * gridStep;
+
+      mctx.strokeStyle = '#141820';
+      mctx.lineWidth = 1 / cam.zoom;
+      for (let x = startX; x <= botRight.x + gridStep; x += gridStep) {
+        mctx.beginPath(); mctx.moveTo(x, topLeft.y); mctx.lineTo(x, botRight.y); mctx.stroke();
+      }
+      for (let y = startY; y <= botRight.y + gridStep; y += gridStep) {
+        mctx.beginPath(); mctx.moveTo(topLeft.x, y); mctx.lineTo(botRight.x, y); mctx.stroke();
+      }
+
+      // RF Attenuation Blockers
+      obstacles.forEach(obs => {
+        const isSel = obs.uid === selectedBlockerUid;
+        mctx.fillStyle = isSel ? 'rgba(239, 68, 68, 0.16)' : 'rgba(239, 68, 68, 0.08)';
+        mctx.strokeStyle = isSel ? '#ef4444' : 'rgba(239, 68, 68, 0.5)';
+        mctx.lineWidth = (isSel ? 1.5 : 1) / cam.zoom;
+        mctx.fillRect(obs.x, obs.y, obs.w, obs.h);
+        mctx.strokeRect(obs.x, obs.y, obs.w, obs.h);
+
+        mctx.save();
+        mctx.beginPath();
+        mctx.rect(obs.x, obs.y, obs.w, obs.h);
+        mctx.clip();
+        mctx.strokeStyle = 'rgba(239, 68, 68, 0.16)';
+        mctx.lineWidth = 1 / cam.zoom;
+        for (let k = -obs.h; k < obs.w + obs.h; k += 10) {
+          mctx.beginPath();
+          mctx.moveTo(obs.x + k, obs.y);
+          mctx.lineTo(obs.x + k - obs.h, obs.y + obs.h);
+          mctx.stroke();
+        }
+        mctx.restore();
+
+        // Corner resize grip
+        const gSize = 6 / cam.zoom;
+        mctx.fillStyle = isSel ? '#ef4444' : '#7f1d1d';
+        mctx.fillRect(obs.x + obs.w - gSize, obs.y + obs.h - gSize, gSize, gSize);
+
+        mctx.fillStyle = '#fca5a5';
+        mctx.font = `600 ${Math.max(8, 9 / cam.zoom)}px "JetBrains Mono", monospace`;
+        mctx.fillText(`-${obs.lossDb}dB`, obs.x + 4, obs.y + 11);
+      });
+
+      // Selected Node RF Sensitivity Contour
+      const selNode = getNode(selectedNodeId);
+      if (selNode && selNode.powered) {
+        const ringR = selNode.longRange ? 380 : 270;
+        mctx.beginPath();
+        mctx.arc(selNode.x, selNode.y, ringR, 0, Math.PI * 2);
+        mctx.strokeStyle = 'rgba(56, 189, 248, 0.22)';
+        mctx.setLineDash([4 / cam.zoom, 4 / cam.zoom]);
+        mctx.lineWidth = 1 / cam.zoom;
+        mctx.stroke();
+        mctx.setLineDash([]);
+      }
+
+      // Pairwise RF Link Lines
+      for (let i = 0; i < nodes.length; i++) {
+        for (let j = i + 1; j < nodes.length; j++) {
+          const a = nodes[i], b = nodes[j];
+          if (!a.powered || !b.powered) continue;
+          const link = computeLinkMetrics(a, b);
+          const midX = (a.x + b.x) / 2;
+          const midY = (a.y + b.y) / 2;
+
+          mctx.beginPath();
+          mctx.moveTo(a.x, a.y);
+          mctx.lineTo(b.x, b.y);
+          if (link.viable) {
+            mctx.strokeStyle = link.rssi > -88 ? 'rgba(16, 185, 129, 0.48)' : 'rgba(245, 158, 11, 0.48)';
+            mctx.lineWidth = ((a.id === selectedNodeId || b.id === selectedNodeId) ? 1.8 : 1.1) / cam.zoom;
+            mctx.setLineDash([]);
+          } else {
+            mctx.strokeStyle = 'rgba(239, 68, 68, 0.25)';
+            mctx.lineWidth = 1 / cam.zoom;
+            mctx.setLineDash([3 / cam.zoom, 4 / cam.zoom]);
+          }
+          mctx.stroke();
+          mctx.setLineDash([]);
+
+          if (a.id === selectedNodeId || b.id === selectedNodeId || !link.viable) {
+            const label = link.viable ? `${link.rssi} dBm` : 'NO LINK';
+            mctx.font = '500 9px "JetBrains Mono", monospace';
+            const tw = mctx.measureText(label).width;
+            mctx.fillStyle = '#0b0d10';
+            mctx.fillRect(midX - tw / 2 - 3, midY - 6, tw + 6, 12);
+            mctx.strokeStyle = '#232833';
+            mctx.lineWidth = 1 / cam.zoom;
+            mctx.strokeRect(midX - tw / 2 - 3, midY - 6, tw + 6, 12);
+            mctx.fillStyle = link.viable ? '#8b949e' : '#ef4444';
+            mctx.fillText(label, midX - tw / 2, midY + 3);
+          }
+        }
+      }
+
+      // Expanding Over-the-Air RF Packet Rings
+      rfWaves.forEach(w => {
+        const alpha = Math.max(0, 1 - w.radius / w.maxRadius);
+        mctx.beginPath();
+        mctx.arc(w.x, w.y, w.radius, 0, Math.PI * 2);
+        mctx.strokeStyle = w.color;
+        mctx.globalAlpha = alpha * 0.85;
+        mctx.lineWidth = 2 / cam.zoom;
+        mctx.stroke();
+        mctx.globalAlpha = 1;
+      });
+
+      // Draw Nodes
+      const now = performance.now();
+      nodes.forEach(n => {
+        const isSel = n.id === selectedNodeId;
+        const isSos = n.screen === SCR.TX_STATUS && n.lastSentPkt && n.lastSentPkt.type === PKT.SOS;
+
+        if (isSel) {
+          mctx.beginPath();
+          mctx.arc(n.x, n.y, 19, 0, Math.PI * 2);
+          mctx.strokeStyle = '#38bdf8';
+          mctx.lineWidth = 1.5 / cam.zoom;
+          mctx.stroke();
+        }
+
+        if (isSos && n.powered) {
+          const pulseR = 16 + ((now / 15) % 16);
+          mctx.beginPath();
+          mctx.arc(n.x, n.y, pulseR, 0, Math.PI * 2);
+          mctx.strokeStyle = 'rgba(239, 68, 68, 0.75)';
+          mctx.lineWidth = 1.5 / cam.zoom;
+          mctx.stroke();
+        }
+
+        mctx.beginPath();
+        mctx.arc(n.x, n.y, 13, 0, Math.PI * 2);
+        mctx.fillStyle = !n.powered ? '#12151b' : (isSos ? '#7f1d1d' : '#181c24');
+        mctx.fill();
+        mctx.strokeStyle = !n.powered ? '#323949' : (isSel ? '#38bdf8' : '#10b981');
+        mctx.lineWidth = 1.5 / cam.zoom;
+        mctx.stroke();
+
+        mctx.fillStyle = n.powered ? '#e5e7eb' : '#6b7280';
+        mctx.font = 'bold 10px "JetBrains Mono", monospace';
+        mctx.textAlign = 'center';
+        mctx.fillText(`N0${n.id}`, n.x, n.y + 3.5);
+
+        const sub = `${n.name}${n.gpsAttached ? ' [G]' : ''}`;
+        mctx.font = '500 9px "JetBrains Mono", monospace';
+        mctx.fillStyle = n.powered ? '#8b949e' : '#4b5563';
+        mctx.fillText(sub, n.x, n.y + 25);
+        mctx.textAlign = 'left';
+      });
+
+      mctx.restore();
+    }
+
+    // =========================================================================
+    // 10. UI SYNCHRONIZATION & HELP MODAL CONTROLS
+    // =========================================================================
+    function openGuideModal() {
+      document.getElementById('guideModal').classList.remove('hidden');
+    }
+
+    function closeGuideModal() {
+      document.getElementById('guideModal').classList.add('hidden');
+    }
+
+    function dismissQuickHint() {
+      document.getElementById('canvasQuickHintBar').classList.add('hidden');
+    }
+
+    function switchGuideTab(idx) {
+      [1, 2, 3].forEach(n => {
+        const panel = document.getElementById(`guideTab${n}`);
+        const btn = document.getElementById(`guideTabBtn${n}`);
+        if (n === idx) {
+          panel.classList.remove('hidden');
+          panel.classList.add('flex');
+          btn.className = 'py-2 px-2 mono text-[11px] font-semibold border-b-2 border-[#38bdf8] text-[#e5e7eb] bg-[#12151b] cursor-pointer';
+        } else {
+          panel.classList.add('hidden');
+          panel.classList.remove('flex');
+          btn.className = 'py-2 px-2 mono text-[11px] font-medium border-b-2 border-transparent text-[#8b949e] hover:text-[#e5e7eb] cursor-pointer';
+        }
+      });
+    }
+
+    function runDemoRollCall() {
+      closeGuideModal();
+      const node = getNode(selectedNodeId);
+      if (node) {
+        node.homeCursor = 0;
+        handleNodeButtonEvent(node, 'SEL_SHORT');
+      }
+    }
+
+    function runDemoMultiHop() {
+      closeGuideModal();
+      document.getElementById('scenarioSelect').value = 'canyon';
+      applyScenario('canyon');
+      switchInspectorTab('packet');
+    }
+
+    function runDemoSosAlert() {
+      closeGuideModal();
+      triggerTripleSosDirect();
+    }
+
+    function selectNode(id) {
+      selectedNodeId = id;
+      syncAllPanels();
+    }
+
+    function syncAllPanels() {
+      syncLeftHardwarePanel();
+      refreshPortalUI();
+      refreshPowerAndMatrixUI();
+      updateCanvasTelemetryOverlay();
+    }
+
+    function syncLeftHardwarePanel() {
+      const node = getNode(selectedNodeId);
+      if (!node) return;
+      document.getElementById('nodeCountLabel').textContent = `${nodes.length}/${MAX_NODES}`;
+
+      const grid = document.getElementById('nodeSelectorGrid');
+      grid.innerHTML = nodes.map(n => {
+        const active = n.id === selectedNodeId;
+        const baseCls = 'py-1 px-1.5 rounded-[4px] border mono text-[10px] flex items-center justify-between cursor-pointer';
+        const stateCls = active
+          ? 'bg-[#181c24] border-[#38bdf8] text-[#e5e7eb] font-semibold'
+          : 'bg-[#0b0d10] border-[#232833] text-[#8b949e] hover:border-[#323949]';
+        const dotColor = n.powered ? 'bg-[#10b981]' : 'bg-[#4b5563]';
+        const gpsChar = n.gpsAttached ? '<span class="text-[#10b981]">G</span>' : '<span class="text-[#323949]">-</span>';
+        return `<button onclick="selectNode(${n.id})" class="${baseCls} ${stateCls}">
+          <span class="flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full ${dotColor}"></span>N0${n.id}</span>
+          ${gpsChar}
+        </button>`;
+      }).join('');
+
+      const statusEl = document.getElementById('selectedNodeStatus');
+      statusEl.textContent = `${node.name} ${node.powered ? 'ONLINE' : 'OFFLINE'}`;
+      statusEl.className = `mono text-[10px] ${node.powered ? 'text-[#10b981]' : 'text-[#ef4444]'}`;
+
+      const gpsTag = document.getElementById('hwGpsTag');
+      gpsTag.textContent = node.gpsAttached ? `GPS(${node.sats})` : 'NO-GPS';
+      gpsTag.className = node.gpsAttached ? 'text-[#10b981]' : 'text-[#8b949e]';
+
+      const pwrBtn = document.getElementById('btnTogglePower');
+      pwrBtn.textContent = node.powered ? 'ON' : 'OFF';
+      pwrBtn.className = node.powered
+        ? 'btn-inst text-[#10b981] border-[#10b981]/40'
+        : 'btn-inst text-[#ef4444] border-[#ef4444]/40';
+
+      const gpsBtn = document.getElementById('btnToggleGps');
+      gpsBtn.textContent = node.gpsAttached ? 'Attached' : 'None';
+      gpsBtn.className = node.gpsAttached
+        ? 'btn-inst text-[#10b981] border-[#10b981]/40'
+        : 'btn-inst text-[#8b949e]';
+
+      const wifiBtn = document.getElementById('btnToggleWifi');
+      wifiBtn.textContent = node.wifiAP ? 'ON' : 'OFF';
+      wifiBtn.className = node.wifiAP
+        ? 'btn-inst text-[#38bdf8] border-[#38bdf8]/40'
+        : 'btn-inst text-[#8b949e]';
+
+      const sleepBtn = document.getElementById('btnToggleSleep');
+      const isSleeping = node.screen === SCR.SLEEPING;
+      sleepBtn.textContent = isSleeping ? 'Sleep (0.8mA)' : 'Active';
+      sleepBtn.className = isSleeping
+        ? 'btn-inst text-[#f59e0b] border-[#f59e0b]/40'
+        : 'btn-inst text-[#8b949e]';
+
+      document.getElementById('batSlider').value = node.battery;
+      const volts = (3.3 + (node.battery / 100) * 0.9).toFixed(2);
+      document.getElementById('batReadout').textContent = `${node.battery}% (${volts}V)`;
+    }
+
+    function toggleSelectedNodePower() {
+      const node = getNode(selectedNodeId);
+      node.powered = !node.powered;
+      if (node.powered) {
+        node.screen = SCR.HOME;
+        triggerAnim(node, 'GLITCH', 360);
+        Buzzer.confirm(node.buzzer);
+        sendSilentPacket(node, PKT.HEARTBEAT, 0xFFFF);
+      }
+      syncAllPanels();
+    }
+
+    function toggleSelectedNodeGps() {
+      const node = getNode(selectedNodeId);
+      node.gpsAttached = !node.gpsAttached;
+      node.gpsFix = node.gpsAttached;
+      node.sats = node.gpsAttached ? 7 : 0;
+      syncAllPanels();
+    }
+
+    function toggleSelectedNodeWifi() {
+      const node = getNode(selectedNodeId);
+      node.wifiAP = !node.wifiAP;
+      if (node.wifiAP) Buzzer.confirm(node.buzzer);
+      syncAllPanels();
+    }
+
+    function toggleSelectedNodeSleep() {
+      const node = getNode(selectedNodeId);
+      if (!node || !node.powered) return;
+      node.screen = node.screen === SCR.SLEEPING ? SCR.HOME : SCR.SLEEPING;
+      if (node.screen === SCR.HOME) triggerAnim(node, 'GLITCH', 300);
+      syncAllPanels();
+    }
+
+    function setSelectedNodeBattery(val) {
+      const node = getNode(selectedNodeId);
+      node.battery = Number(val);
+      syncAllPanels();
+    }
+
+    function updateCanvasTelemetryOverlay() {
+      const node = getNode(selectedNodeId);
+      if (!node) return;
+      const coords = getNodeCoords(node);
+      document.getElementById('canvasCoordsReadout').textContent =
+        `${node.name}: ${coords.lat.toFixed(4)}°N, ${coords.lon.toFixed(4)}°E`;
+
+      const peers = nodes.filter(p => p.id !== node.id);
+      const viableCount = peers.filter(p => computeLinkMetrics(node, p).viable).length;
+      document.getElementById('canvasLinksReadout').textContent =
+        `LINKS: ${viableCount}/${peers.length} VIABLE`;
+
+      document.getElementById('canvasTrafficReadout').textContent =
+        `${totalMeshTx} TX / ${totalMeshRelays} RLY`;
+    }
+
+    // =========================================================================
+    // 11. RIGHT INSPECTOR PANELS (192.168.4.1 PORTAL, PACKET, LINK & POWER)
+    // =========================================================================
+    function switchInspectorTab(tab) {
+      activeInspectorTab = tab;
+      ['portal', 'packet', 'power'].forEach(t => {
+        const panel = document.getElementById(`tab${t.charAt(0).toUpperCase() + t.slice(1)}`);
+        const btn = document.getElementById(`tabBtn${t.charAt(0).toUpperCase() + t.slice(1)}`);
+        if (t === tab) {
+          panel.classList.remove('hidden');
+          btn.className = 'py-2 px-1.5 mono text-[11px] font-semibold border-b-2 border-[#38bdf8] text-[#e5e7eb] bg-[#12151b] cursor-pointer';
+        } else {
+          panel.classList.add('hidden');
+          btn.className = 'py-2 px-1.5 mono text-[11px] font-medium border-b-2 border-transparent text-[#8b949e] hover:text-[#e5e7eb] cursor-pointer';
+        }
+      });
+      if (tab === 'power') refreshPowerAndMatrixUI();
+    }
+
+    function refreshPortalUI() {
+      const node = getNode(selectedNodeId);
+      if (!node) return;
+
+      document.getElementById('portalApTitle').textContent = `SSID: LASTLINK_${node.name}`;
+      document.getElementById('portalApMeta').textContent = `http://192.168.4.1 • TX 11 dBm • ${node.longRange ? 'SF10' : 'SF7'}`;
+      document.getElementById('portalOfflineNodeName').textContent = node.name;
+
+      const quickBtn = document.getElementById('portalQuickApToggle');
+      const offlineNotice = document.getElementById('portalOfflineNotice');
+      const activeContent = document.getElementById('portalActiveContent');
+
+      if (node.wifiAP && node.powered) {
+        quickBtn.textContent = 'Disable AP';
+        quickBtn.className = 'btn-inst text-[#38bdf8] border-[#38bdf8]/40';
+        offlineNotice.classList.add('hidden');
+        activeContent.classList.remove('hidden');
+        activeContent.classList.add('flex');
+      } else {
+        quickBtn.textContent = 'Enable AP';
+        quickBtn.className = 'btn-inst text-[#8b949e]';
+        offlineNotice.classList.remove('hidden');
+        activeContent.classList.add('hidden');
+        activeContent.classList.remove('flex');
+      }
+
+      const tbody = document.getElementById('portalNodesTbody');
+      const actList = Object.values(node.neighbors);
+      if (actList.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="4" class="py-2 text-[#8b949e] text-center">No neighbors cached (trigger Roll-Call)</td></tr>`;
+      } else {
+        tbody.innerHTML = actList.map(nb => {
+          const lat = (nb.latE7 / 1e7).toFixed(4);
+          const lon = (nb.lonE7 / 1e7).toFixed(4);
+          const gpsCell = nb.hasGps
+            ? `<a href="https://maps.google.com/?q=${lat},${lon}" target="_blank" class="text-[#38bdf8] hover:underline">${lat},${lon}</a>`
+            : `<span class="text-[#8b949e]">RF-Only</span>`;
+          return `<tr>
+            <td class="py-1 pr-1.5 font-semibold text-[#e5e7eb]">${nb.name}</td>
+            <td class="py-1 pr-1.5 text-[#10b981]">${nb.rssi}dB</td>
+            <td class="py-1 pr-1.5 text-[#8b949e]">${nb.batPct}%</td>
+            <td class="py-1">${gpsCell}</td>
+          </tr>`;
+        }).join('');
+      }
+
+      document.getElementById('portalInboxCount').textContent = `${node.inbox.length}`;
+      const list = document.getElementById('portalInboxList');
+      if (node.inbox.length === 0) {
+        list.innerHTML = `<div class="mono text-[10px] text-[#8b949e] py-3 text-center">No packets received on ${node.name}.</div>`;
+      } else {
+        list.innerHTML = node.inbox.map(it => {
+          const cardCls = it.isSOS
+            ? 'bg-[#1f1215] border-l-2 border-l-[#ef4444] border border-[#ef4444]/40'
+            : 'bg-[#12151b] border border-[#232833]';
+          const lat = (it.latE7 / 1e7).toFixed(4);
+          const lon = (it.lonE7 / 1e7).toFixed(4);
+          const gpsRow = it.hasGps
+            ? `<div class="mono text-[9px] text-[#38bdf8] mt-1">GPS: ${lat}, ${lon}</div>`
+            : '';
+          return `<div class="${cardCls} rounded-[3px] p-2">
+            <div class="flex justify-between mono text-[9px]">
+              <span class="${it.isSOS ? 'text-[#ef4444] font-bold' : 'text-[#10b981] font-semibold'}">
+                ${it.isSOS ? 'SOS' : 'MSG'} • ${it.srcName}
+              </span>
+              <span class="text-[#8b949e]">${it.hops}H • ${it.rssi}dBm</span>
+            </div>
+            <div class="mono text-[11px] font-semibold text-[#e5e7eb] mt-0.5">${it.text}</div>
+            ${gpsRow}
+          </div>`;
+        }).join('');
+      }
+    }
+
+    function handleWebDispatch(e) {
+      e.preventDefault();
+      const inp = document.getElementById('webDispatchInput');
+      const msg = inp.value.trim().toUpperCase();
+      if (!msg) return;
+      const node = getNode(selectedNodeId);
+      if (node && node.powered) {
+        startTrackedSend(node, PKT.TEXT, 0xFFFF, 0, msg);
+        inp.value = '';
+      }
+    }
+
+    function renderPacketDissector() {
+      const logDiv = document.getElementById('packetLogList');
+      if (packetHistoryLog.length === 0) {
+        logDiv.innerHTML = `<div class="text-[#8b949e] text-center py-3">Awaiting RF packet capture...</div>`;
+        return;
+      }
+
+      logDiv.innerHTML = packetHistoryLog.slice(0, 20).map(item => {
+        const isSel = selectedPacketEntry && selectedPacketEntry.uid === item.uid;
+        const pName = PKT_NAMES[item.pkt.type] || `0x${item.pkt.type.toString(16)}`;
+        const badgeCls = item.pkt.type === PKT.SOS ? 'text-[#ef4444]' : (item.pkt.type === PKT.ACK ? 'text-[#f59e0b]' : 'text-[#10b981]');
+        return `<button onclick="selectPacketForDissect('${item.uid}')"
+          class="w-full text-left px-1.5 py-1 rounded-[3px] flex items-center justify-between cursor-pointer ${isSel ? 'bg-[#181c24] border border-[#323949]' : 'hover:bg-[#12151b]'}">
+          <span><span class="text-[#8b949e]">${item.timeStr}</span> <strong class="${badgeCls}">${pName}</strong> <span class="text-[#e5e7eb]">${item.txNodeName}${item.isRelay ? '[RLY]' : ''}</span></span>
+          <span class="text-[#8b949e]">#${item.pkt.msgId} TTL:${item.pkt.ttl}</span>
+        </button>`;
+      }).join('');
+
+      if (selectedPacketEntry) {
+        const p = selectedPacketEntry.pkt;
+        const grid = document.getElementById('packetFieldsGrid');
+        grid.innerHTML = `
+          <div><span class="text-[#8b949e]">type:</span> <span class="text-[#e5e7eb]">0x${p.type.toString(16).padStart(2,'0').toUpperCase()} (${PKT_NAMES[p.type]})</span></div>
+          <div><span class="text-[#8b949e]">srcId:</span> <span class="text-[#e5e7eb]">${p.srcId} (${p.srcName})</span></div>
+          <div><span class="text-[#8b949e]">dstId:</span> <span class="text-[#e5e7eb]">0x${p.dstId.toString(16).toUpperCase()}</span></div>
+          <div><span class="text-[#8b949e]">msgId:</span> <span class="text-[#e5e7eb]">${p.msgId}</span></div>
+          <div><span class="text-[#8b949e]">ttl:</span> <span class="text-[#e5e7eb]">${p.origTtl} → ${p.ttl}</span></div>
+          <div><span class="text-[#8b949e]">hasGps:</span> <span class="text-[#e5e7eb]">${p.hasGps} (code:${p.code})</span></div>
+          <div><span class="text-[#8b949e]">latE7:</span> <span class="text-[#38bdf8]">${p.latE7}</span></div>
+          <div><span class="text-[#8b949e]">lonE7:</span> <span class="text-[#38bdf8]">${p.lonE7}</span></div>
+          <div class="col-span-2"><span class="text-[#8b949e]">text[17]:</span> <span class="text-[#10b981]">"${p.text}"</span></div>
+          <div class="col-span-2"><span class="text-[#8b949e]">authTag (FNV-1a):</span> <span class="text-[#f59e0b] font-semibold">0x${p.authTag.toString(16).padStart(4,'0').toUpperCase()}</span></div>
+        `;
+        const hex = Array.from(selectedPacketEntry.bytes).map(b => b.toString(16).padStart(2, '0').toUpperCase()).join(' ');
+        document.getElementById('packetHexDump').textContent = hex;
+      }
+    }
+
+    function selectPacketForDissect(uid) {
+      selectedPacketEntry = packetHistoryLog.find(e => e.uid === uid);
+      renderPacketDissector();
+    }
+
+    function clearPacketLog() {
+      packetHistoryLog = [];
+      selectedPacketEntry = null;
+      renderPacketDissector();
+    }
+
+    function refreshPowerAndMatrixUI() {
+      const node = getNode(selectedNodeId);
+      if (!node) return;
+      document.getElementById('rfMatrixSourceTag').textContent = `FROM ${node.name}`;
+      document.getElementById('powerNodeTag').textContent = node.name;
+
+      const tbody = document.getElementById('rfMatrixTbody');
+      const peers = nodes.filter(p => p.id !== node.id);
+      tbody.innerHTML = peers.map(peer => {
+        if (!node.powered || !peer.powered) {
+          return `<tr>
+            <td class="py-1 pr-1 font-semibold text-[#8b949e]">${peer.name}</td>
+            <td colspan="4" class="py-1 text-[#4b5563]">Offline</td>
+          </tr>`;
+        }
+        const link = computeLinkMetrics(node, peer);
+        return `<tr>
+          <td class="py-1 pr-1 font-semibold text-[#e5e7eb]">${peer.name}</td>
+          <td class="py-1 pr-1 text-[#8b949e]">${Math.round(link.distMeters)}m</td>
+          <td class="py-1 pr-1 ${link.obstacleLoss > 0 ? 'text-[#f59e0b]' : 'text-[#8b949e]'}">${link.obstacleLoss > 0 ? `-${link.obstacleLoss}dB` : '0dB'}</td>
+          <td class="py-1 pr-1 text-[#38bdf8]">${link.rssi}/${link.snr}</td>
+          <td class="py-1 font-semibold ${link.viable ? 'text-[#10b981]' : 'text-[#ef4444]'}">${link.viable ? 'OK' : 'LOST'}</td>
+        </tr>`;
+      }).join('');
+
+      const capMah = 3000 * (node.battery / 100);
+      const profiles = [
+        { label: 'Light Sleep + LoRa RX', ma: 11.8, sub: '0.8mA CPU + 11.0mA SX1278' },
+        { label: 'Light Sleep + NEO-6M GPS', ma: 51.8, sub: '11.8mA + 40.0mA GNSS' },
+        { label: 'Active UI + Rescue Radar', ma: node.gpsAttached ? 65.8 : 25.8, sub: 'CPU + OLED + RX' + (node.gpsAttached ? ' + GPS' : '') },
+        { label: 'Wi-Fi AP (11dBm) + TX Burst', ma: 165.0, sub: 'SoftAP + +20dBm LoRa TX' }
+      ];
+
+      document.getElementById('powerBreakdownList').innerHTML = profiles.map(pr => {
+        const hrs = Math.round(capMah / pr.ma);
+        return `<div class="flex items-center justify-between bg-[#12151b] px-2 py-1.5 rounded-[3px] border border-[#232833]">
+          <div>
+            <div class="text-[#e5e7eb] font-medium">${pr.label}</div>
+            <div class="text-[9px] text-[#8b949e]">${pr.sub}</div>
+          </div>
+          <div class="text-right">
+            <div class="text-[#10b981] font-semibold">${pr.ma.toFixed(1)} mA</div>
+            <div class="text-[9px] text-[#8b949e]">~${hrs}h</div>
+          </div>
+        </div>`;
+      }).join('');
+    }
+
+    // =========================================================================
+    // 12. SCENARIO PRESETS & GLOBAL WORKBENCH CONTROLS
+    // =========================================================================
+    function applyScenario(mode) {
+      rfWaves = [];
+      scheduledEvents = [];
+      selectedBlockerUid = null;
+      updateBlockerToolbarState();
+
+      if (mode === 'los4') {
+        nodes = [
+          createNode(1, 'NODE01', 115, 185, true),
+          createNode(2, 'NODE02', 310, 80,  true),
+          createNode(3, 'NODE03', 320, 305, false),
+          createNode(4, 'NODE04', 535, 185, false)
+        ];
+        obstacles = [];
+        fitMapToNodes();
+        selectNode(1);
+        sendSilentPacket(nodes[0], PKT.ROLLCALL, 0xFFFF);
+      } else if (mode === 'canyon') {
+        nodes = [
+          createNode(1, 'NODE01', 90,  195, true),
+          createNode(2, 'NODE02', 305, 60,  true),
+          createNode(3, 'NODE03', 315, 325, false),
+          createNode(4, 'NODE04', 550, 195, false)
+        ];
+        obstacles = [
+          { uid: `BLK_${++blockerSeq}`, label: 'BUILDING', x: 270, y: 130, w: 92, h: 120, lossDb: 28 },
+          { uid: `BLK_${++blockerSeq}`, label: 'SHIELD',   x: 385, y: 145, w: 28, h: 100, lossDb: 55 }
+        ];
+        fitMapToNodes();
+        selectNode(1);
+        startTrackedSend(nodes[0], PKT.TEXT, 4, 0, 'RELAY PATH OK');
+      } else if (mode === 'grid6') {
+        nodes = [
+          createNode(1, 'NODE01', 80,  105, true),
+          createNode(2, 'NODE02', 80,  285, true),
+          createNode(3, 'NODE03', 290, 90,  false),
+          createNode(4, 'NODE04', 300, 295, false),
+          createNode(5, 'NODE05', 525, 115, true),
+          createNode(6, 'NODE06', 535, 280, false)
+        ];
+        obstacles = [
+          { uid: `BLK_${++blockerSeq}`, label: 'RIDGE',    x: 190, y: 140, w: 80, h: 105, lossDb: 35 },
+          { uid: `BLK_${++blockerSeq}`, label: 'BUILDING', x: 395, y: 145, w: 76, h: 105, lossDb: 28 }
+        ];
+        fitMapToNodes();
+        selectNode(1);
+        sendSilentPacket(nodes[0], PKT.ROLLCALL, 0xFFFF);
+      } else if (mode === 'failover') {
+        nodes = [
+          createNode(1, 'NODE01', 90,  195, true),
+          createNode(2, 'NODE02', 305, 60,  true),
+          createNode(3, 'NODE03', 315, 325, false),
+          createNode(4, 'NODE04', 550, 195, false)
+        ];
+        nodes[1].powered = false;
+        obstacles = [
+          { uid: `BLK_${++blockerSeq}`, label: 'SHIELD', x: 300, y: 135, w: 30, h: 120, lossDb: 55 }
+        ];
+        fitMapToNodes();
+        selectNode(1);
+        startTrackedSend(nodes[0], PKT.TEXT, 4, 0, 'FAILOVER N03');
+      }
+
+      syncAllPanels();
+    }
+
+    function toggleGlobalSF() {
+      globalLongRange = !globalLongRange;
+      nodes.forEach(n => { n.longRange = globalLongRange; });
+      const btn = document.getElementById('btnGlobalSF');
+      btn.textContent = globalLongRange ? 'SF10 / BW125' : 'SF7 / BW125';
+      document.getElementById('canvasSensReadout').textContent = globalLongRange
+        ? '-132 dBm (SF10)'
+        : '-123 dBm (SF7)';
+      syncAllPanels();
+    }
+
+    function toggleAudioMute() {
+      globalAudioEnabled = !globalAudioEnabled;
+      const btn = document.getElementById('btnAudioMute');
+      btn.textContent = globalAudioEnabled ? 'Audio: ON' : 'Audio: OFF';
+      btn.className = globalAudioEnabled ? 'btn-inst text-[#e5e7eb]' : 'btn-inst text-[#8b949e]';
+    }
+
+    function resetWorkbench() {
+      totalMeshTx = 0;
+      totalMeshRelays = 0;
+      packetHistoryLog = [];
+      selectedPacketEntry = null;
+      document.getElementById('scenarioSelect').value = 'los4';
+      applyScenario('los4');
+      renderPacketDissector();
+    }
+
+    // =========================================================================
+    // 13. MAIN SIMULATION & RENDERING LOOP
+    // =========================================================================
+    function tickSimulation() {
+      const now = performance.now();
+
+      for (let i = scheduledEvents.length - 1; i >= 0; i--) {
+        if (now >= scheduledEvents[i].dueTime) {
+          const ev = scheduledEvents.splice(i, 1)[0];
+          ev.fn();
+        }
+      }
+
+      for (let i = rfWaves.length - 1; i >= 0; i--) {
+        const w = rfWaves[i];
+        w.radius += 5.4;
+        const originNode = getNode(w.originNodeId);
+
+        nodes.forEach(target => {
+          if (!target.powered || w.deliveredTo.has(target.id)) return;
+          const d = Math.hypot(target.x - w.x, target.y - w.y);
+          if (w.radius >= d) {
+            w.deliveredTo.add(target.id);
+            if (originNode) {
+              const link = computeLinkMetrics(originNode, target);
+              if (link.viable) {
+                handleNodeReceivePacket(target, w.pkt, link.rssi, link.snr);
+              }
+            }
+          }
+        });
+
+        if (w.radius >= w.maxRadius) {
+          rfWaves.splice(i, 1);
+        }
+      }
+
+      nodes.forEach(n => {
+        if (!n.powered) return;
+
+        if (n.screen === SCR.SOS_COUNTDOWN && (now - n.sosCountdownStart) >= 5000) {
+          startTrackedSend(n, PKT.SOS, 0xFFFF, 0, 'SOS EMERGENCY!');
+        }
+
+        if (n.rangeTestRunning && (now - n.lastRangePingTime) >= 2500) {
+          n.lastRangePingTime = now;
+          n.rangePingSent++;
+          const coords = getNodeCoords(n);
+          const p = {
+            type: PKT.RANGETEST,
+            srcId: n.id,
+            srcName: n.name,
+            dstId: 0xFFFF,
+            msgId: n.msgCounter++,
+            origTtl: n.ttl,
+            ttl: n.ttl,
+            code: n.battery,
+            hasGps: n.gpsAttached ? 1 : 0,
+            latE7: n.gpsAttached ? coords.latE7 : 0,
+            lonE7: n.gpsAttached ? coords.lonE7 : 0,
+            text: `PING #${n.rangePingSent}`,
+            authTag: 0
+          };
+          transmitPacket(n, p, false);
+        }
+
+        if (n.waitingAckMsgId !== 0 && (now - n.txRetryTimer) >= 3000) {
+          n.txRetryTimer = now;
+          if (n.lastSentPkt && n.lastSentPkt.type === PKT.SOS) {
+            n.sosPulseCount++;
+            const coords = getNodeCoords(n);
+            n.lastSentPkt.msgId = n.msgCounter++;
+            n.lastSentPkt.hasGps = n.gpsAttached ? 1 : 0;
+            n.lastSentPkt.latE7 = n.gpsAttached ? coords.latE7 : 0;
+            n.lastSentPkt.lonE7 = n.gpsAttached ? coords.lonE7 : 0;
+            n.waitingAckMsgId = n.lastSentPkt.msgId;
+            if (n.id === selectedNodeId) Buzzer.sos(n.buzzer);
+            transmitPacket(n, { ...n.lastSentPkt }, false);
+          } else if (n.txDeliveryStage === 1 || n.txDeliveryStage === 2) {
+            if (n.txRetriesLeft > 0) {
+              n.txRetriesLeft--;
+              transmitPacket(n, { ...n.lastSentPkt }, false);
+            } else {
+              n.txDeliveryStage = 4;
+              n.waitingAckMsgId = 0;
+              if (n.id === selectedNodeId) Buzzer.error(n.buzzer);
+            }
+          }
+        }
+
+        const sleepTimeout = SLEEP_TIMES[n.sleepIdx];
+        if (sleepTimeout > 0 && !n.wifiAP && !n.rangeTestRunning &&
+            n.screen !== SCR.SLEEPING && n.screen !== SCR.SOS_COUNTDOWN &&
+            n.screen !== SCR.INCOMING_ALERT && n.waitingAckMsgId === 0 &&
+            (now - n.lastActivityTime) > sleepTimeout) {
+          n.screen = SCR.SLEEPING;
+          if (n.id === selectedNodeId) syncLeftHardwarePanel();
+        }
+      });
+
+      const selNode = getNode(selectedNodeId);
+      const ledEl = document.getElementById('hwStatusLed');
+      if (selNode && selNode.powered && now < selNode.ledFlashUntil) {
+        ledEl.className = 'w-2 h-2 rounded-full bg-[#38bdf8]';
+      } else {
+        ledEl.className = 'w-2 h-2 rounded-full bg-[#232833]';
+      }
+
+      renderSelectedNodeOled();
+      drawMeshCanvas();
+      requestAnimationFrame(tickSimulation);
+    }
+
+    window.addEventListener('load', () => {
+      resizeMeshCanvas();
+      fitMapToNodes();
+      selectNode(1);
+      setTimeout(() => sendSilentPacket(nodes[0], PKT.ROLLCALL, 0xFFFF), 200);
+      requestAnimationFrame(tickSimulation);
+    });
+  </script>
+</body>
+</html>
